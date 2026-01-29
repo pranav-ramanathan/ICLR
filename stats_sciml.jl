@@ -452,7 +452,7 @@ function race_search_parallel(n::Int;
                                check_dt::Real = 0.05,
                                verbose::Bool = false,
                                nworkers::Int = Threads.nthreads(),
-                               early_stop::Bool = false)
+                               early_stop::Bool = true)
     
     # Generate CSR lines once (shared read-only across workers)
     line_ptr, line_idx = _generate_lines_csr(n)
@@ -680,7 +680,7 @@ function main()
     verbose = false
     parallel = false
     nworkers = Threads.nthreads()
-    early_stop = false
+    early_stop = true
     
     i = 1
     while i <= length(ARGS)
