@@ -2,20 +2,32 @@ module N3L
 
 using Random: MersenneTwister, shuffle!
 using OrdinaryDiffEq: ODEProblem, solve, Tsit5, terminate!, DiscreteCallback, CallbackSet
+
 using Printf: @printf, @sprintf
 using Dates: now, format
 
 export N3LProblem, solve_n3l, race_search, race_search_parallel, analyze_solution
 
-struct N3LProblem{T<:AbstractFloat}
-    n::Int
-    k::Int
-    lines::Vector{Vector{Int}}
+# ============================================================================
+# Mutable problem struct with CSR-style line storage and preallocated buffers
+# ============================================================================
+mutable struct N3LProblem{T<:AbstractFloat}
+    const n::Int
+    const k::Int
+    # CSR-style packed line representation (immutable after construction)
+    const line_ptr::Vector{Int}   # length m+1, indices into line_idx
+    const line_idx::Vector{Int}   # flattened cell indices for all lines
+    const nlines::Int             # number of lines (m)
+    # Tunable parameters (updated per-job)
     α::T
     β::T
     λ::T
     ρ::T
-    grad::Vector{T}
+    # Preallocated workspace (per-worker, never shared)
+    const grad::Vector{T}
+    const linesums::Vector{T}     # per-line sums cache
+    # Cached energy (updated during gradient computation)
+    last_energy::T
 end
 
 mutable struct ConvergenceState{T<:AbstractFloat}
@@ -25,13 +37,29 @@ end
 
 ConvergenceState(E₀::T) where {T} = ConvergenceState{T}(E₀, zero(T))
 
+# Constructor with CSR line generation
 function N3LProblem(n::Int; k::Int=2n, α=50.0, β=5.0, λ=10.0, ρ=10.0)
-    lines = _generate_lines(n)
+    line_ptr, line_idx = _generate_lines_csr(n)
+    nlines = length(line_ptr) - 1
     T = promote_type(typeof(α), typeof(β), typeof(λ), typeof(ρ))
-    N3LProblem{T}(n, k, lines, T(α), T(β), T(λ), T(ρ), zeros(T, n^2))
+    N3LProblem{T}(n, k, line_ptr, line_idx, nlines,
+                  T(α), T(β), T(λ), T(ρ),
+                  zeros(T, n^2), zeros(T, nlines), zero(T))
 end
 
-function _generate_lines(n::Int)
+# Update only tunable parameters (reuse buffers)
+@inline function update_params!(p::N3LProblem{T}, α::T, β::T, λ::T, ρ::T) where {T}
+    p.α = α
+    p.β = β
+    p.λ = λ
+    p.ρ = ρ
+    nothing
+end
+
+# ============================================================================
+# CSR-style line generation (replaces Vector{Vector{Int}})
+# ============================================================================
+function _generate_lines_csr(n::Int)
     @inline idx(i, j) = (i - 1) * n + j
     
     dirs = Set{Tuple{Int,Int}}()
@@ -45,7 +73,7 @@ function _generate_lines(n::Int)
     end
     
     seen = Set{Vector{Int}}()
-    lines = Vector{Vector{Int}}()
+    lines_temp = Vector{Vector{Int}}()
     
     for (dx, dy) in dirs
         for i in 1:n, j in 1:n
@@ -63,29 +91,58 @@ function _generate_lines(n::Int)
                 key = sort(pts)
                 if key ∉ seen
                     push!(seen, key)
-                    push!(lines, pts)
+                    push!(lines_temp, pts)
                 end
             end
         end
     end
     
+    # Convert to CSR format
+    m = length(lines_temp)
+    line_ptr = Vector{Int}(undef, m + 1)
+    total_len = sum(length, lines_temp)
+    line_idx = Vector{Int}(undef, total_len)
+    
+    ptr = 1
+    for (li, L) in enumerate(lines_temp)
+        line_ptr[li] = ptr
+        for idx in L
+            line_idx[ptr] = idx
+            ptr += 1
+        end
+    end
+    line_ptr[m + 1] = ptr
+    
+    line_ptr, line_idx
+end
+
+# Legacy helper for count_violations (returns Vector{Vector{Int}} view-equivalent)
+function _lines_from_csr(line_ptr::Vector{Int}, line_idx::Vector{Int})
+    m = length(line_ptr) - 1
+    lines = Vector{Vector{Int}}(undef, m)
+    @inbounds for li in 1:m
+        lines[li] = line_idx[line_ptr[li]:line_ptr[li+1]-1]
+    end
     lines
 end
 
+# ============================================================================
+# Energy computation with CSR lines (fused line processing)
+# ============================================================================
 function energy(u::AbstractVector, p::N3LProblem{T}) where {T}
-    E_line = _energy_lines(u, p.lines)
+    E_line = _energy_lines_csr(u, p.line_ptr, p.line_idx, p.nlines)
     E_bin = _energy_binary(u)
     E_mass = _energy_mass(u, p.k)
     E_box = _energy_box(u)
     p.α * E_line + p.β * E_bin + p.λ * E_mass + p.ρ * E_box
 end
 
-@inline function _energy_lines(u, lines)
+@inline function _energy_lines_csr(u, line_ptr, line_idx, nlines)
     E = zero(eltype(u))
-    @inbounds for L in lines
+    @inbounds for li in 1:nlines
         s = zero(eltype(u))
-        for i in L
-            s += u[i]
+        for pi in line_ptr[li]:line_ptr[li+1]-1
+            s += u[line_idx[pi]]
         end
         r = max(s - 2, zero(eltype(u)))
         E += r * r
@@ -115,42 +172,74 @@ end
     E
 end
 
+# ============================================================================
+# Fused gradient computation with energy caching
+# Computes gradient AND caches current energy in p.last_energy
+# Single pass over lines: compute sum, accumulate energy, add gradient
+# ============================================================================
 function grad_energy!(p::N3LProblem{T}, u::AbstractVector) where {T}
     g = p.grad
+    line_ptr = p.line_ptr
+    line_idx = p.line_idx
+    nlines = p.nlines
+    linesums = p.linesums
+    
     fill!(g, zero(T))
     
-    @inbounds for L in p.lines
+    # === Line penalty: fused sum + gradient + energy accumulation ===
+    E_line = zero(T)
+    @inbounds for li in 1:nlines
         s = zero(T)
-        for i in L
-            s += u[i]
+        for pi in line_ptr[li]:line_ptr[li+1]-1
+            s += u[line_idx[pi]]
         end
+        linesums[li] = s  # cache for potential reuse
         z = s - 2
         if z > 0
+            E_line += z * z
             c = p.α * 2 * z
-            for i in L
-                g[i] += c
+            for pi in line_ptr[li]:line_ptr[li+1]-1
+                g[line_idx[pi]] += c
             end
         end
     end
     
+    # === Binary penalty ===
+    E_bin = zero(T)
     @inbounds for i in eachindex(u)
         x = u[i]
+        E_bin += x * x * (1 - x) * (1 - x)
         g[i] += p.β * (2x - 6x^2 + 4x^3)
     end
     
-    mass_grad = p.λ * 2 * (sum(u) - p.k)
+    # === Mass penalty ===
+    mass_sum = zero(T)
+    @inbounds for i in eachindex(u)
+        mass_sum += u[i]
+    end
+    mass_diff = mass_sum - p.k
+    E_mass = mass_diff * mass_diff
+    mass_grad = p.λ * 2 * mass_diff
     @inbounds for i in eachindex(u)
         g[i] += mass_grad
     end
     
+    # === Box penalty ===
+    E_box = zero(T)
     @inbounds for i in eachindex(u)
         x = u[i]
         if x < 0
+            E_box += x * x
             g[i] += p.ρ * 2x
         elseif x > 1
-            g[i] += p.ρ * 2(x - 1)
+            d = x - 1
+            E_box += d * d
+            g[i] += p.ρ * 2d
         end
     end
+    
+    # Cache total energy for callback use
+    p.last_energy = p.α * E_line + p.β * E_bin + p.λ * E_mass + p.ρ * E_box
     
     g
 end
@@ -163,6 +252,10 @@ function rhs!(du, u, p::N3LProblem, t)
     nothing
 end
 
+# ============================================================================
+# Solver with DiscreteCallback for stall detection
+# Uses cached energy from grad_energy! to avoid recomputation
+# ============================================================================
 function solve_n3l(p::N3LProblem{T};
                    tspan::Real = 3.0,
                    tol::Real = 1e-6,
@@ -173,21 +266,25 @@ function solve_n3l(p::N3LProblem{T};
     rng = MersenneTwister(seed)
     u0 = rand(rng, T, p.n^2)
     
-    state = ConvergenceState(energy(u0, p))
+    # Initialize cached energy
+    p.last_energy = energy(u0, p)
+    state = ConvergenceState(p.last_energy)
     
+    # Success callback: uses cached energy (updated after each RHS call)
     cb_success = DiscreteCallback(
-        (u, t, int) -> energy(u, int.p) ≤ tol,
+        (u, t, int) -> int.p.last_energy ≤ tol,
         terminate!;
         save_positions = (false, false)
     )
     
+    # Stall detection via DiscreteCallback with time-based condition
     last_check_t = Ref(zero(T))
     function stall_condition(u, t, int)
         t - last_check_t[] ≥ check_dt
     end
     function stall_affect!(int)
         last_check_t[] = int.t
-        E = energy(int.u, int.p)
+        E = int.p.last_energy
         if E < 0.999 * state.best_energy
             state.best_energy = E
             state.last_improve_t = int.t
@@ -207,13 +304,38 @@ function solve_n3l(p::N3LProblem{T};
                 save_everystep = false)
     
     u_final = sol.u[end]
-    (u = u_final, E = energy(u_final, p), best_E = state.best_energy, t = sol.t[end])
+    E_final = p.last_energy
+    (u = u_final, E = E_final, best_E = state.best_energy, t = sol.t[end])
 end
 
+# ============================================================================
+# Thresholding and violation counting (only called when E ≤ tol)
+# ============================================================================
 function threshold_board(u::AbstractVector, n::Int; thr=0.5)
-    reshape([x > thr ? 1 : 0 for x in u], n, n)
+    board = Matrix{Int}(undef, n, n)
+    @inbounds for j in 1:n, i in 1:n
+        board[i, j] = u[(i-1)*n + j] > thr ? 1 : 0
+    end
+    board
 end
 
+function count_violations_csr(board::AbstractMatrix, line_ptr::Vector{Int}, line_idx::Vector{Int})
+    flat = vec(board)
+    nlines = length(line_ptr) - 1
+    violations = 0
+    @inbounds for li in 1:nlines
+        s = 0
+        for pi in line_ptr[li]:line_ptr[li+1]-1
+            s += flat[line_idx[pi]]
+        end
+        if s >= 3
+            violations += 1
+        end
+    end
+    violations
+end
+
+# Legacy wrapper
 function count_violations(board::AbstractMatrix, lines::Vector{Vector{Int}})
     flat = vec(board)
     violations = 0
@@ -229,6 +351,9 @@ function count_violations(board::AbstractMatrix, lines::Vector{Vector{Int}})
     violations
 end
 
+# ============================================================================
+# Sequential race search
+# ============================================================================
 function race_search(n::Int;
                      k::Int = 2n,
                      α_list = [50.0, 100.0, 200.0],
@@ -242,8 +367,8 @@ function race_search(n::Int;
                      check_dt::Real = 0.05,
                      verbose::Bool = false)
     
+    # Reusable problem instance
     base = N3LProblem(n; k, α=first(α_list), β=first(β_list), λ=first(λ_list), ρ=first(ρ_list))
-    lines = base.lines
     
     goal_solutions = Vector{NamedTuple{(:u, :E, :cfg, :board, :pts, :viol), 
                                         Tuple{Vector{Float64}, Float64, NamedTuple, Matrix{Int}, Int, Int}}}()
@@ -253,39 +378,48 @@ function race_search(n::Int;
     total_configs = length(cfgs)
     
     verbose && @printf("n=%d k=%d lines=%d configs=%d seeds=%d\n",
-                       n, k, length(lines), length(cfgs), length(seeds))
+                       n, k, base.nlines, length(cfgs), length(seeds))
     
     for (ci, (α, β, λ, ρ)) in enumerate(cfgs)
-        p = N3LProblem{Float64}(n, k, lines, α, β, λ, ρ, zeros(n^2))
+        # Reuse problem, just update parameters
+        update_params!(base, Float64(α), Float64(β), Float64(λ), Float64(ρ))
         
         verbose && @printf("\nConfig %d/%d: a=%.1f b=%.1f l=%.1f r=%.1f\n",
                            ci, length(cfgs), α, β, λ, ρ)
         
         for s in seeds
-            out = solve_n3l(p; tspan, tol, patience, check_dt, seed=s)
+            out = solve_n3l(base; tspan, tol, patience, check_dt, seed=s)
             
-            board = threshold_board(out.u, n)
-            npts = sum(board)
-            nviol = count_violations(board, lines)
-            cfg = (α=α, β=β, λ=λ, ρ=ρ, seed=s, t=out.t)
-            
-            verbose && @printf("  seed=%d t=%.3f E=%.3e pts=%d viol=%d\n",
-                               s, out.t, out.E, npts, nviol)
-            
-            if out.E ≤ tol && nviol == 0 && npts == k
-                push!(goal_solutions, (u=copy(out.u), E=out.E, cfg=cfg, 
-                                       board=board, pts=npts, viol=nviol))
-                push!(goal_configs, (α, β, λ, ρ))
+            # Only build board and count violations if energy is low enough
+            if out.E ≤ tol
+                board = threshold_board(out.u, n)
+                npts = sum(board)
+                nviol = count_violations_csr(board, base.line_ptr, base.line_idx)
+                cfg = (α=α, β=β, λ=λ, ρ=ρ, seed=s, t=out.t)
+                
+                verbose && @printf("  seed=%d t=%.3f E=%.3e pts=%d viol=%d\n",
+                                   s, out.t, out.E, npts, nviol)
+                
+                if nviol == 0 && npts == k
+                    push!(goal_solutions, (u=copy(out.u), E=out.E, cfg=cfg, 
+                                           board=board, pts=npts, viol=nviol))
+                    push!(goal_configs, (α, β, λ, ρ))
+                end
+            else
+                verbose && @printf("  seed=%d t=%.3f E=%.3e (skip)\n",
+                                   s, out.t, out.E)
             end
         end
     end
     
-    (solutions = goal_solutions, n = n, k = k, lines = length(lines), 
+    (solutions = goal_solutions, n = n, k = k, lines = base.nlines, 
      goal_configs = length(goal_configs), total_configs = total_configs,
      total_seeds = length(seeds))
 end
 
-# Parallel implementation using thread pool with work queue
+# ============================================================================
+# Parallel race search with worker-local problem reuse
+# ============================================================================
 struct Job
     config_id::Int
     α::Float64
@@ -320,21 +454,30 @@ function race_search_parallel(n::Int;
                                nworkers::Int = Threads.nthreads(),
                                early_stop::Bool = false)
     
-    lines = _generate_lines(n)
+    # Generate CSR lines once (shared read-only across workers)
+    line_ptr, line_idx = _generate_lines_csr(n)
+    nlines = length(line_ptr) - 1
+    
     cfgs = [(α, β, λ, ρ) for α in α_list for β in β_list for λ in λ_list for ρ in ρ_list]
     total_configs = length(cfgs)
     total_jobs = total_configs * length(seeds)
     
     verbose && @printf("n=%d k=%d lines=%d configs=%d seeds=%d workers=%d total_jobs=%d\n",
-                       n, k, length(lines), total_configs, length(seeds), nworkers, total_jobs)
+                       n, k, nlines, total_configs, length(seeds), nworkers, total_jobs)
     
     # Thread-safe channels for job distribution and result collection
     jobs = Channel{Job}(min(1000, total_jobs))
     results = Channel{WorkerResult}(min(1000, total_jobs))
     
-    # Atomic counter for progress tracking
+    # Atomic counters for progress tracking
     jobs_completed = Threads.Atomic{Int}(0)
+    solutions_count = Threads.Atomic{Int}(0)
     solution_found = Threads.Atomic{Bool}(false)
+    start_time = time()
+    
+    # Print start message (always, not just verbose)
+    @printf("Starting: n=%d k=%d | %d configs × %d seeds = %d jobs | %d workers\n",
+            n, k, total_configs, length(seeds), total_jobs, nworkers)
     
     # Producer: enqueue all jobs
     producer = @async begin
@@ -347,9 +490,11 @@ function race_search_parallel(n::Int;
         close(jobs)
     end
     
-    # Worker threads
-    workers = [@async worker_task(jobs, results, n, k, lines, tspan, tol, patience, check_dt,
-                                   jobs_completed, solution_found, early_stop, total_jobs, verbose)
+    # Worker threads (each with own reusable problem instance)
+    workers = [@async worker_task_opt(jobs, results, n, k, line_ptr, line_idx, nlines,
+                                       tspan, tol, patience, check_dt,
+                                       jobs_completed, solutions_count, solution_found, 
+                                       early_stop, total_jobs, start_time)
                for _ in 1:nworkers]
     
     # Result aggregator
@@ -363,6 +508,7 @@ function race_search_parallel(n::Int;
                 push!(goal_solutions, (u=res.u, E=res.E, cfg=res.cfg, 
                                        board=res.board, pts=res.pts, viol=res.viol))
                 push!(goal_configs, (res.cfg.α, res.cfg.β, res.cfg.λ, res.cfg.ρ))
+                Threads.atomic_add!(solutions_count, 1)
                 early_stop && (solution_found[] = true)
             end
         end
@@ -376,49 +522,72 @@ function race_search_parallel(n::Int;
     close(results)
     wait(aggregator)
     
-    verbose && println("\nCompleted $(jobs_completed[]) jobs, found $(length(goal_solutions)) solutions")
+    verbose && println("\nCompleted $(jobs_completed[]) jobs, found $(solutions_count[]) solutions")
+    println()  # Clear the progress line
     
-    (solutions = goal_solutions, n = n, k = k, lines = length(lines), 
+    (solutions = goal_solutions, n = n, k = k, lines = nlines, 
      goal_configs = length(goal_configs), total_configs = total_configs,
      total_seeds = length(seeds))
 end
 
-function worker_task(jobs, results, n, k, lines, tspan, tol, patience, check_dt,
-                     jobs_completed, solution_found, early_stop, total_jobs, verbose)
-    # Preallocate problem structure (reused for all jobs in this worker)
-    grad_buffer = zeros(Float64, n^2)
+# Optimized worker: reuses a single N3LProblem instance per worker
+function worker_task_opt(jobs, results, n, k, line_ptr, line_idx, nlines,
+                          tspan, tol, patience, check_dt,
+                          jobs_completed, solutions_count, solution_found, 
+                          early_stop, total_jobs, start_time)
+    # Create one problem instance per worker (with own grad/linesums buffers)
+    p = N3LProblem{Float64}(n, k, line_ptr, line_idx, nlines,
+                            50.0, 5.0, 10.0, 10.0,  # placeholder params
+                            zeros(Float64, n^2),     # grad buffer
+                            zeros(Float64, nlines),  # linesums buffer
+                            0.0)                     # last_energy
+    
+    # Print progress every ~5% (20 updates total)
+    progress_interval = max(1, div(total_jobs, 20))
     
     for job in jobs
         # Check early termination
         early_stop && solution_found[] && break
         
-        # Build problem for this config
-        p = N3LProblem{Float64}(n, k, lines, job.α, job.β, job.λ, job.ρ, grad_buffer)
+        # Update parameters (reuse buffers)
+        update_params!(p, job.α, job.β, job.λ, job.ρ)
         
         # Run ODE solve
         out = solve_n3l(p; tspan, tol, patience, check_dt, seed=job.seed)
         
-        # Evaluate result
-        board = threshold_board(out.u, n)
-        npts = sum(board)
-        nviol = count_violations(board, lines)
+        # Only build board and count violations if E ≤ tol
         cfg = (α=job.α, β=job.β, λ=job.λ, ρ=job.ρ, seed=job.seed, t=out.t)
         
-        success = out.E ≤ tol && nviol == 0 && npts == k
+        if out.E ≤ tol
+            board = threshold_board(out.u, n)
+            npts = sum(board)
+            nviol = count_violations_csr(board, line_ptr, line_idx)
+            success = nviol == 0 && npts == k
+            put!(results, WorkerResult(success, copy(out.u), out.E, cfg, board, npts, nviol))
+        else
+            # Create empty board for non-successful result
+            board = zeros(Int, n, n)
+            put!(results, WorkerResult(false, out.u, out.E, cfg, board, 0, -1))
+        end
         
-        # Send result
-        put!(results, WorkerResult(success, copy(out.u), out.E, cfg, board, npts, nviol))
-        
-        # Update progress
+        # Update progress and print periodically
         completed = Threads.atomic_add!(jobs_completed, 1) + 1
         
-        if verbose && completed % max(1, div(total_jobs, 100)) == 0
+        if completed % progress_interval == 0 || completed == total_jobs
+            elapsed = time() - start_time
             pct = 100.0 * completed / total_jobs
-            @printf("\rProgress: %d/%d (%.1f%%)", completed, total_jobs, pct)
+            rate = completed / elapsed
+            eta = (total_jobs - completed) / rate
+            nsol = solutions_count[]
+            @printf("\r[%5.1f%%] %d/%d jobs | %d solutions | %.1f jobs/s | ETA %.0fs   ", 
+                    pct, completed, total_jobs, nsol, rate, eta)
         end
     end
 end
 
+# ============================================================================
+# Solution analysis (unchanged output format)
+# ============================================================================
 function analyze_solution(result; file::Union{String,Nothing}=nothing, elapsed::Float64=0.0)
     nsol = length(result.solutions)
     
@@ -466,6 +635,34 @@ function analyze_solution(result; file::Union{String,Nothing}=nothing, elapsed::
     end
     
     sol
+end
+
+# ============================================================================
+# Benchmark hook (activated by N3L_BENCH=1 environment variable)
+# ============================================================================
+function run_benchmark(n::Int; k::Int=2n, seed::Int=42)
+    p = N3LProblem(n; k)
+    
+    # Warmup
+    solve_n3l(p; seed=seed, tspan=0.1)
+    
+    # Timed run
+    GC.gc()
+    t0 = time_ns()
+    allocs_before = Base.gc_live_bytes()
+    
+    out = solve_n3l(p; seed=seed, tspan=3.0)
+    
+    allocs_after = Base.gc_live_bytes()
+    t1 = time_ns()
+    
+    elapsed_ms = (t1 - t0) / 1e6
+    alloc_bytes = allocs_after - allocs_before
+    
+    @printf("[N3L_BENCH] n=%d solve_n3l: %.2f ms, ~%.1f KB alloc, E=%.2e, t=%.3f\n",
+            n, elapsed_ms, alloc_bytes/1024, out.E, out.t)
+    
+    out
 end
 
 end # module
@@ -528,6 +725,12 @@ function main()
         else
             i += 1
         end
+    end
+    
+    # Benchmark hook (always runs with n=5 for consistent comparison)
+    if get(ENV, "N3L_BENCH", "") == "1"
+        N3L.run_benchmark(5)
+        return
     end
     
     start_time = time()
