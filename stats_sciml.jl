@@ -261,7 +261,7 @@ function solve_n3l(p::N3LProblem{T};
                    tol::Real = 1e-6,
                    patience::Real = 0.5,
                    check_dt::Real = 0.05,
-                   seed::Int = 0) where {T}
+                   seed::Integer = 0) where {T}
     
     rng = MersenneTwister(seed)
     u0 = rand(rng, T, p.n^2)
@@ -360,12 +360,17 @@ function race_search(n::Int;
                      β_list = [2.0, 5.0, 10.0],
                      λ_list = [5.0, 10.0, 20.0],
                      ρ_list = [5.0, 10.0],
-                     seeds = 1:200,
+                     n_seeds::Int = 200,
+                     master_seed::Int = 42,
                      tspan::Real = 3.0,
                      tol::Real = 1e-6,
                      patience::Real = 0.5,
                      check_dt::Real = 0.05,
                      verbose::Bool = false)
+    
+    # Pre-generate random seeds using master RNG (reproducible)
+    master_rng = MersenneTwister(master_seed)
+    random_seeds = rand(master_rng, UInt32, n_seeds)
     
     # Reusable problem instance
     base = N3LProblem(n; k, α=first(α_list), β=first(β_list), λ=first(λ_list), ρ=first(ρ_list))
@@ -377,8 +382,8 @@ function race_search(n::Int;
     goal_configs = Set{Tuple{Float64,Float64,Float64,Float64}}()
     total_configs = length(cfgs)
     
-    verbose && @printf("n=%d k=%d lines=%d configs=%d seeds=%d\n",
-                       n, k, base.nlines, length(cfgs), length(seeds))
+    verbose && @printf("n=%d k=%d lines=%d configs=%d seeds=%d master_seed=%d\n",
+                       n, k, base.nlines, length(cfgs), n_seeds, master_seed)
     
     for (ci, (α, β, λ, ρ)) in enumerate(cfgs)
         # Reuse problem, just update parameters
@@ -387,8 +392,8 @@ function race_search(n::Int;
         verbose && @printf("\nConfig %d/%d: a=%.1f b=%.1f l=%.1f r=%.1f\n",
                            ci, length(cfgs), α, β, λ, ρ)
         
-        for s in seeds
-            out = solve_n3l(base; tspan, tol, patience, check_dt, seed=s)
+        for s in random_seeds
+            out = solve_n3l(base; tspan, tol, patience, check_dt, seed=Int(s))
             
             # Only build board and count violations if energy is low enough
             if out.E ≤ tol
@@ -397,7 +402,7 @@ function race_search(n::Int;
                 nviol = count_violations_csr(board, base.line_ptr, base.line_idx)
                 cfg = (α=α, β=β, λ=λ, ρ=ρ, seed=s, t=out.t)
                 
-                verbose && @printf("  seed=%d t=%.3f E=%.3e pts=%d viol=%d\n",
+                verbose && @printf("  seed=%u t=%.3f E=%.3e pts=%d viol=%d\n",
                                    s, out.t, out.E, npts, nviol)
                 
                 if nviol == 0 && npts == k
@@ -406,7 +411,7 @@ function race_search(n::Int;
                     push!(goal_configs, (α, β, λ, ρ))
                 end
             else
-                verbose && @printf("  seed=%d t=%.3f E=%.3e (skip)\n",
+                verbose && @printf("  seed=%u t=%.3f E=%.3e (skip)\n",
                                    s, out.t, out.E)
             end
         end
@@ -414,7 +419,7 @@ function race_search(n::Int;
     
     (solutions = goal_solutions, n = n, k = k, lines = base.nlines, 
      goal_configs = length(goal_configs), total_configs = total_configs,
-     total_seeds = length(seeds))
+     total_seeds = n_seeds)
 end
 
 # ============================================================================
@@ -426,7 +431,7 @@ struct Job
     β::Float64
     λ::Float64
     ρ::Float64
-    seed::Int
+    seed::UInt32  # Actual random seed value (not sequential index)
 end
 
 struct WorkerResult
@@ -445,7 +450,8 @@ function race_search_parallel(n::Int;
                                β_list = [2.0, 5.0, 10.0],
                                λ_list = [5.0, 10.0, 20.0],
                                ρ_list = [5.0, 10.0],
-                               seeds = 1:200,
+                               n_seeds::Int = 200,
+                               master_seed::Int = 42,
                                tspan::Real = 3.0,
                                tol::Real = 1e-6,
                                patience::Real = 0.5,
@@ -460,10 +466,14 @@ function race_search_parallel(n::Int;
     
     cfgs = [(α, β, λ, ρ) for α in α_list for β in β_list for λ in λ_list for ρ in ρ_list]
     total_configs = length(cfgs)
-    total_jobs = total_configs * length(seeds)
+    total_jobs = total_configs * n_seeds
+    
+    # Pre-generate random seeds using master RNG (reproducible)
+    master_rng = MersenneTwister(master_seed)
+    random_seeds = rand(master_rng, UInt32, n_seeds)
     
     verbose && @printf("n=%d k=%d lines=%d configs=%d seeds=%d workers=%d total_jobs=%d\n",
-                       n, k, nlines, total_configs, length(seeds), nworkers, total_jobs)
+                       n, k, nlines, total_configs, n_seeds, nworkers, total_jobs)
     
     # Thread-safe channels for job distribution and result collection
     jobs = Channel{Job}(min(1000, total_jobs))
@@ -476,14 +486,14 @@ function race_search_parallel(n::Int;
     start_time = time()
     
     # Print start message (always, not just verbose)
-    @printf("Starting: n=%d k=%d | %d configs × %d seeds = %d jobs | %d workers\n",
-            n, k, total_configs, length(seeds), total_jobs, nworkers)
+    @printf("Starting: n=%d k=%d | %d configs × %d seeds = %d jobs | %d workers | master_seed=%d\n",
+            n, k, total_configs, n_seeds, total_jobs, nworkers, master_seed)
     
     # Producer: enqueue all jobs
     producer = @async begin
         for (ci, (α, β, λ, ρ)) in enumerate(cfgs)
             early_stop && solution_found[] && break
-            for s in seeds
+            for s in random_seeds
                 put!(jobs, Job(ci, α, β, λ, ρ, s))
             end
         end
@@ -504,35 +514,79 @@ function race_search_parallel(n::Int;
     
     aggregator = @async begin
         job_num = 0
-        for res in results
+        while !solution_found[] || isready(results)
+            # Poll for result availability
+            if !isready(results)
+                sleep(0.001)
+                continue
+            end
+            
+            res = try
+                take!(results)
+            catch e
+                if isa(e, InvalidStateException) || !isopen(results)
+                    break
+                end
+                rethrow(e)
+            end
+            
             job_num += 1
             if res.success
                 push!(goal_solutions, (u=res.u, E=res.E, cfg=res.cfg, 
                                        board=res.board, pts=res.pts, viol=res.viol))
                 push!(goal_configs, (res.cfg.α, res.cfg.β, res.cfg.λ, res.cfg.ρ))
                 Threads.atomic_add!(solutions_count, 1)
-                # Print which job succeeded
-                @printf("\n✓ Job %d succeeded: α=%.0f β=%.0f λ=%.0f ρ=%.0f seed=%d E=%.2e\n",
+                # Print which job succeeded (shows actual random seed, not sequential index)
+                @printf("\n✓ Job %d succeeded: α=%.0f β=%.0f λ=%.0f ρ=%.0f seed=%u E=%.2e\n",
                         job_num, res.cfg.α, res.cfg.β, res.cfg.λ, res.cfg.ρ, res.cfg.seed, res.E)
                 early_stop && (solution_found[] = true)
             end
         end
     end
     
-    # Wait for completion
-    wait(producer)
-    for w in workers
-        wait(w)
+    # Wait for completion (with early stop support)
+    if early_stop
+        # When early_stop is enabled, don't wait for producer to finish all jobs
+        # Just wait for workers and aggregator to complete after solution_found is set
+        while !solution_found[]
+            sleep(0.01)
+        end
+        # Give workers time to exit their polling loops
+        sleep(0.1)
+        # Close channels to unblock any waiting tasks
+        close(jobs)
+        close(results)
+        # Wait for tasks with timeout
+        @async (sleep(5); close(jobs); close(results))
+        try
+            wait(producer)
+        catch
+        end
+        for w in workers
+            try
+                wait(w)
+            catch
+            end
+        end
+        try
+            wait(aggregator)
+        catch
+        end
+    else
+        wait(producer)
+        for w in workers
+            wait(w)
+        end
+        close(results)
+        wait(aggregator)
     end
-    close(results)
-    wait(aggregator)
     
     verbose && println("\nCompleted $(jobs_completed[]) jobs, found $(solutions_count[]) solutions")
     println()  # Clear the progress line
     
     (solutions = goal_solutions, n = n, k = k, lines = nlines, 
      goal_configs = length(goal_configs), total_configs = total_configs,
-     total_seeds = length(seeds))
+     total_seeds = n_seeds)
 end
 
 # Optimized worker: reuses a single N3LProblem instance per worker
@@ -550,9 +604,25 @@ function worker_task_opt(jobs, results, n, k, line_ptr, line_idx, nlines,
     # Print progress every ~5% (20 updates total)
     progress_interval = max(1, div(total_jobs, 20))
     
-    for job in jobs
+    while !solution_found[]
         # Check early termination
         early_stop && solution_found[] && break
+        
+        # Poll for job availability (avoid blocking on take! which hangs after early_stop)
+        if !isready(jobs)
+            sleep(0.001)  # Small sleep to avoid busy-waiting
+            continue
+        end
+        
+        # Take job (should not block now)
+        job = try
+            take!(jobs)
+        catch e
+            if isa(e, InvalidStateException) || !isopen(jobs)
+                break  # Channel closed, no more jobs
+            end
+            rethrow(e)
+        end
         
         # Update parameters (reuse buffers)
         update_params!(p, job.α, job.β, job.λ, job.ρ)
@@ -677,7 +747,8 @@ using .N3L
 
 function main()
     n = 5
-    seeds = 1:50
+    n_seeds = 50
+    master_seed = 42
     tspan = 3.0
     tol = 1e-6
     save_file = false
@@ -693,7 +764,10 @@ function main()
             n = parse(Int, ARGS[i+1])
             i += 2
         elseif arg == "--seeds" && i < length(ARGS)
-            seeds = 1:parse(Int, ARGS[i+1])
+            n_seeds = parse(Int, ARGS[i+1])
+            i += 2
+        elseif arg == "--master-seed" && i < length(ARGS)
+            master_seed = parse(Int, ARGS[i+1])
             i += 2
         elseif arg == "--tspan" && i < length(ARGS)
             tspan = parse(Float64, ARGS[i+1])
@@ -720,6 +794,7 @@ function main()
             println("Usage: julia --project=. stats_sciml.jl [options]")
             println("  -n N          Grid size (default: 5)")
             println("  --seeds N     Number of seeds (default: 50)")
+            println("  --master-seed N  Master seed for reproducibility (default: 42)")
             println("  --tspan T     Integration time (default: 3.0)")
             println("  --tol T       Energy tolerance (default: 1e-6)")
             println("  --file        Save best solution to n_N_HHMMSS.txt")
@@ -743,11 +818,11 @@ function main()
     
     if parallel
         verbose && println("Running in PARALLEL mode with $nworkers workers")
-        result = race_search_parallel(n; k=2n, seeds=seeds, tspan=tspan, tol=tol, 
+        result = race_search_parallel(n; k=2n, n_seeds=n_seeds, master_seed=master_seed, tspan=tspan, tol=tol,
                                        verbose=verbose, nworkers=nworkers, early_stop=early_stop)
     else
         verbose && println("Running in SEQUENTIAL mode")
-        result = race_search(n; k=2n, seeds=seeds, tspan=tspan, tol=tol, verbose=verbose)
+        result = race_search(n; k=2n, n_seeds=n_seeds, master_seed=master_seed, tspan=tspan, tol=tol, verbose=verbose)
     end
     
     elapsed = time() - start_time
