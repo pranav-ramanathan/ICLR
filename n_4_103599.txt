@@ -1,0 +1,17 @@
+# n=4 k=8
+# points=8 violations=0
+# E=9.681910981616581e-7
+# time=3.04s
+# cfg: α=200.0 β=5.0 λ=10.0 ρ=10.0
+# seed=1 t=1.251
+
+1 0 0 1
+0 0 1 1
+1 1 0 0
+0 1 1 0
+
+# SUMMARY
+# Total configs tested: 54
+# Configs reaching goal (2n pts, 0 viol): 54
+# Total valid solutions found: 1424
+# Success rate: 100.0%

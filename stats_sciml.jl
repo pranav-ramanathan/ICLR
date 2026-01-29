@@ -245,10 +245,12 @@ function race_search(n::Int;
     base = N3LProblem(n; k, α=first(α_list), β=first(β_list), λ=first(λ_list), ρ=first(ρ_list))
     lines = base.lines
     
-    best_solutions = Vector{NamedTuple{(:u, :E, :cfg, :board, :pts, :viol), 
+    goal_solutions = Vector{NamedTuple{(:u, :E, :cfg, :board, :pts, :viol), 
                                         Tuple{Vector{Float64}, Float64, NamedTuple, Matrix{Int}, Int, Int}}}()
     
     cfgs = [(α, β, λ, ρ) for α in α_list for β in β_list for λ in λ_list for ρ in ρ_list]
+    goal_configs = Set{Tuple{Float64,Float64,Float64,Float64}}()
+    total_configs = length(cfgs)
     
     verbose && @printf("n=%d k=%d lines=%d configs=%d seeds=%d\n",
                        n, k, length(lines), length(cfgs), length(seeds))
@@ -270,37 +272,61 @@ function race_search(n::Int;
             verbose && @printf("  seed=%d t=%.3f E=%.3e pts=%d viol=%d\n",
                                s, out.t, out.E, npts, nviol)
             
-            if out.E ≤ tol && nviol == 0
-                push!(best_solutions, (u=copy(out.u), E=out.E, cfg=cfg, 
+            if out.E ≤ tol && nviol == 0 && npts == k
+                push!(goal_solutions, (u=copy(out.u), E=out.E, cfg=cfg, 
                                        board=board, pts=npts, viol=nviol))
+                push!(goal_configs, (α, β, λ, ρ))
             end
         end
     end
     
-    (solutions = best_solutions, n = n, k = k, lines = length(lines))
+    (solutions = goal_solutions, n = n, k = k, lines = length(lines), 
+     goal_configs = length(goal_configs), total_configs = total_configs,
+     total_seeds = length(seeds))
 end
 
-function analyze_solution(result; file::Union{String,Nothing}=nothing)
-    if isempty(result.solutions)
+function analyze_solution(result; file::Union{String,Nothing}=nothing, elapsed::Float64=0.0)
+    nsol = length(result.solutions)
+    
+    if nsol == 0
         println("No valid solutions found")
         return nothing
     end
     
-    sol = result.solutions[rand(1:length(result.solutions))]
+    sol = result.solutions[rand(1:nsol)]
     
-    @printf("n=%d k=%d | points=%d violations=%d | E=%.2e\n", 
-            result.n, result.k, sol.pts, sol.viol, sol.E)
+    total_runs = result.total_configs * result.total_seeds
+    
+    @printf("n=%d k=%d | pts=%d viol=%d | E=%.2e | time=%.2fs\n", 
+            result.n, result.k, sol.pts, sol.viol, sol.E, elapsed)
+    @printf("Configs with valid solutions: %d/%d\n",
+            result.goal_configs, result.total_configs)
+    @printf("Valid solutions: %d/%d runs (%.1f%%)\n", 
+            nsol, total_runs, 100*nsol/total_runs)
     display(sol.board)
     
     if file !== nothing
         timestamp = format(now(), "HHMMss")
         filename = "n_$(result.n)_$(timestamp).txt"
         open(filename, "w") do io
-            println(io, "# n=$(result.n) k=$(result.k) points=$(sol.pts) violations=$(sol.viol)")
-            println(io, "# E=$(sol.E) cfg=$(sol.cfg)")
+            println(io, "# n=$(result.n) k=$(result.k)")
+            println(io, "# points=$(sol.pts) violations=$(sol.viol)")
+            println(io, "# E=$(sol.E)")
+            println(io, "# time=$(round(elapsed, digits=2))s")
+            println(io, "# cfg: α=$(sol.cfg.α) β=$(sol.cfg.β) λ=$(sol.cfg.λ) ρ=$(sol.cfg.ρ)")
+            println(io, "# seed=$(sol.cfg.seed) t=$(round(sol.cfg.t, digits=3))")
+            println(io)
             for row in eachrow(sol.board)
                 println(io, join(row, " "))
             end
+            println(io)
+            println(io, "# SUMMARY")
+            println(io, "# Total configs tested: $(result.total_configs)")
+            println(io, "# Seeds per config: $(result.total_seeds)")
+            println(io, "# Total runs: $total_runs")
+            println(io, "# Configs with valid solutions: $(result.goal_configs)")
+            println(io, "# Total valid solutions: $nsol")
+            println(io, "# Success rate: $(round(100*nsol/total_runs, digits=1))%")
         end
         println("\nSaved to: $filename")
     end
@@ -355,8 +381,11 @@ function main()
         end
     end
     
+    start_time = time()
     result = race_search(n; k=2n, seeds=seeds, tspan=tspan, tol=tol, verbose=verbose)
-    analyze_solution(result; file = save_file ? "" : nothing)
+    elapsed = time() - start_time
+    
+    analyze_solution(result; file = save_file ? "" : nothing, elapsed=elapsed)
 end
 
 main()
