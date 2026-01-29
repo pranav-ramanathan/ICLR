@@ -503,12 +503,17 @@ function race_search_parallel(n::Int;
     goal_configs = Set{Tuple{Float64,Float64,Float64,Float64}}()
     
     aggregator = @async begin
+        job_num = 0
         for res in results
+            job_num += 1
             if res.success
                 push!(goal_solutions, (u=res.u, E=res.E, cfg=res.cfg, 
                                        board=res.board, pts=res.pts, viol=res.viol))
                 push!(goal_configs, (res.cfg.α, res.cfg.β, res.cfg.λ, res.cfg.ρ))
                 Threads.atomic_add!(solutions_count, 1)
+                # Print which job succeeded
+                @printf("\n✓ Job %d succeeded: α=%.0f β=%.0f λ=%.0f ρ=%.0f seed=%d E=%.2e\n",
+                        job_num, res.cfg.α, res.cfg.β, res.cfg.λ, res.cfg.ρ, res.cfg.seed, res.E)
                 early_stop && (solution_found[] = true)
             end
         end
@@ -570,17 +575,14 @@ function worker_task_opt(jobs, results, n, k, line_ptr, line_idx, nlines,
             put!(results, WorkerResult(false, out.u, out.E, cfg, board, 0, -1))
         end
         
-        # Update progress and print periodically
+        # Update progress
         completed = Threads.atomic_add!(jobs_completed, 1) + 1
         
         if completed % progress_interval == 0 || completed == total_jobs
             elapsed = time() - start_time
-            pct = 100.0 * completed / total_jobs
             rate = completed / elapsed
             eta = (total_jobs - completed) / rate
-            nsol = solutions_count[]
-            @printf("\r[%5.1f%%] %d/%d jobs | %d solutions | %.1f jobs/s | ETA %.0fs   ", 
-                    pct, completed, total_jobs, nsol, rate, eta)
+            @printf("\r[%d/%d] %.1f jobs/s | ETA %.0fs   ", completed, total_jobs, rate, eta)
         end
     end
 end
