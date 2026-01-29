@@ -568,6 +568,10 @@ function worker_task_opt(jobs, results, n, k, line_ptr, line_idx, nlines,
             npts = sum(board)
             nviol = count_violations_csr(board, line_ptr, line_idx)
             success = nviol == 0 && npts == k
+            # Set early stop flag immediately in worker (not aggregator) to avoid race
+            if success && early_stop
+                solution_found[] = true
+            end
             put!(results, WorkerResult(success, copy(out.u), out.E, cfg, board, npts, nviol))
         else
             # Create empty board for non-successful result
