@@ -5,7 +5,7 @@ using OrdinaryDiffEq: ODEProblem, solve, Tsit5, terminate!, DiscreteCallback, Ca
 using Printf: @printf, @sprintf
 using Dates: now, format
 
-export N3LProblem, solve_n3l, race_search, analyze_solution
+export N3LProblem, solve_n3l, race_search, race_search_parallel, analyze_solution
 
 struct N3LProblem{T<:AbstractFloat}
     n::Int
@@ -285,6 +285,140 @@ function race_search(n::Int;
      total_seeds = length(seeds))
 end
 
+# Parallel implementation using thread pool with work queue
+struct Job
+    config_id::Int
+    α::Float64
+    β::Float64
+    λ::Float64
+    ρ::Float64
+    seed::Int
+end
+
+struct WorkerResult
+    success::Bool
+    u::Vector{Float64}
+    E::Float64
+    cfg::NamedTuple
+    board::Matrix{Int}
+    pts::Int
+    viol::Int
+end
+
+function race_search_parallel(n::Int;
+                               k::Int = 2n,
+                               α_list = [50.0, 100.0, 200.0],
+                               β_list = [2.0, 5.0, 10.0],
+                               λ_list = [5.0, 10.0, 20.0],
+                               ρ_list = [5.0, 10.0],
+                               seeds = 1:200,
+                               tspan::Real = 3.0,
+                               tol::Real = 1e-6,
+                               patience::Real = 0.5,
+                               check_dt::Real = 0.05,
+                               verbose::Bool = false,
+                               nworkers::Int = Threads.nthreads(),
+                               early_stop::Bool = false)
+    
+    lines = _generate_lines(n)
+    cfgs = [(α, β, λ, ρ) for α in α_list for β in β_list for λ in λ_list for ρ in ρ_list]
+    total_configs = length(cfgs)
+    total_jobs = total_configs * length(seeds)
+    
+    verbose && @printf("n=%d k=%d lines=%d configs=%d seeds=%d workers=%d total_jobs=%d\n",
+                       n, k, length(lines), total_configs, length(seeds), nworkers, total_jobs)
+    
+    # Thread-safe channels for job distribution and result collection
+    jobs = Channel{Job}(min(1000, total_jobs))
+    results = Channel{WorkerResult}(min(1000, total_jobs))
+    
+    # Atomic counter for progress tracking
+    jobs_completed = Threads.Atomic{Int}(0)
+    solution_found = Threads.Atomic{Bool}(false)
+    
+    # Producer: enqueue all jobs
+    producer = @async begin
+        for (ci, (α, β, λ, ρ)) in enumerate(cfgs)
+            early_stop && solution_found[] && break
+            for s in seeds
+                put!(jobs, Job(ci, α, β, λ, ρ, s))
+            end
+        end
+        close(jobs)
+    end
+    
+    # Worker threads
+    workers = [@async worker_task(jobs, results, n, k, lines, tspan, tol, patience, check_dt,
+                                   jobs_completed, solution_found, early_stop, total_jobs, verbose)
+               for _ in 1:nworkers]
+    
+    # Result aggregator
+    goal_solutions = Vector{NamedTuple{(:u, :E, :cfg, :board, :pts, :viol), 
+                                        Tuple{Vector{Float64}, Float64, NamedTuple, Matrix{Int}, Int, Int}}}()
+    goal_configs = Set{Tuple{Float64,Float64,Float64,Float64}}()
+    
+    aggregator = @async begin
+        for res in results
+            if res.success
+                push!(goal_solutions, (u=res.u, E=res.E, cfg=res.cfg, 
+                                       board=res.board, pts=res.pts, viol=res.viol))
+                push!(goal_configs, (res.cfg.α, res.cfg.β, res.cfg.λ, res.cfg.ρ))
+                early_stop && (solution_found[] = true)
+            end
+        end
+    end
+    
+    # Wait for completion
+    wait(producer)
+    for w in workers
+        wait(w)
+    end
+    close(results)
+    wait(aggregator)
+    
+    verbose && println("\nCompleted $(jobs_completed[]) jobs, found $(length(goal_solutions)) solutions")
+    
+    (solutions = goal_solutions, n = n, k = k, lines = length(lines), 
+     goal_configs = length(goal_configs), total_configs = total_configs,
+     total_seeds = length(seeds))
+end
+
+function worker_task(jobs, results, n, k, lines, tspan, tol, patience, check_dt,
+                     jobs_completed, solution_found, early_stop, total_jobs, verbose)
+    # Preallocate problem structure (reused for all jobs in this worker)
+    grad_buffer = zeros(Float64, n^2)
+    
+    for job in jobs
+        # Check early termination
+        early_stop && solution_found[] && break
+        
+        # Build problem for this config
+        p = N3LProblem{Float64}(n, k, lines, job.α, job.β, job.λ, job.ρ, grad_buffer)
+        
+        # Run ODE solve
+        out = solve_n3l(p; tspan, tol, patience, check_dt, seed=job.seed)
+        
+        # Evaluate result
+        board = threshold_board(out.u, n)
+        npts = sum(board)
+        nviol = count_violations(board, lines)
+        cfg = (α=job.α, β=job.β, λ=job.λ, ρ=job.ρ, seed=job.seed, t=out.t)
+        
+        success = out.E ≤ tol && nviol == 0 && npts == k
+        
+        # Send result
+        put!(results, WorkerResult(success, copy(out.u), out.E, cfg, board, npts, nviol))
+        
+        # Update progress
+        completed = Threads.atomic_add!(jobs_completed, 1) + 1
+        
+        if verbose && completed % max(1, div(total_jobs, 100)) == 0
+            pct = 100.0 * completed / total_jobs
+            @printf("\rProgress: %d/%d (%.1f%%)", completed, total_jobs, pct)
+        end
+    end
+end
+
 function analyze_solution(result; file::Union{String,Nothing}=nothing, elapsed::Float64=0.0)
     nsol = length(result.solutions)
     
@@ -345,6 +479,9 @@ function main()
     tol = 1e-6
     save_file = false
     verbose = false
+    parallel = false
+    nworkers = Threads.nthreads()
+    early_stop = false
     
     i = 1
     while i <= length(ARGS)
@@ -367,6 +504,15 @@ function main()
         elseif arg == "-v" || arg == "--verbose"
             verbose = true
             i += 1
+        elseif arg == "-p" || arg == "--parallel"
+            parallel = true
+            i += 1
+        elseif arg == "-j" && i < length(ARGS)
+            nworkers = parse(Int, ARGS[i+1])
+            i += 2
+        elseif arg == "--early-stop"
+            early_stop = true
+            i += 1
         elseif arg == "-h" || arg == "--help"
             println("Usage: julia --project=. stats_sciml.jl [options]")
             println("  -n N          Grid size (default: 5)")
@@ -375,6 +521,9 @@ function main()
             println("  --tol T       Energy tolerance (default: 1e-6)")
             println("  --file        Save best solution to n_N_HHMMSS.txt")
             println("  -v, --verbose Print per-seed progress")
+            println("  -p, --parallel Use parallel execution with thread pool")
+            println("  -j N          Number of parallel workers (default: Threads.nthreads()=$nworkers)")
+            println("  --early-stop  Stop when first valid solution is found")
             return
         else
             i += 1
@@ -382,7 +531,16 @@ function main()
     end
     
     start_time = time()
-    result = race_search(n; k=2n, seeds=seeds, tspan=tspan, tol=tol, verbose=verbose)
+    
+    if parallel
+        verbose && println("Running in PARALLEL mode with $nworkers workers")
+        result = race_search_parallel(n; k=2n, seeds=seeds, tspan=tspan, tol=tol, 
+                                       verbose=verbose, nworkers=nworkers, early_stop=early_stop)
+    else
+        verbose && println("Running in SEQUENTIAL mode")
+        result = race_search(n; k=2n, seeds=seeds, tspan=tspan, tol=tol, verbose=verbose)
+    end
+    
     elapsed = time() - start_time
     
     analyze_solution(result; file = save_file ? "" : nothing, elapsed=elapsed)

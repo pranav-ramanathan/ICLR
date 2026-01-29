@@ -1,0 +1,27 @@
+# n=12 k=24
+# points=24 violations=0
+# E=9.978328608693872e-7
+# time=211.11s
+# cfg: α=200.0 β=10.0 λ=20.0 ρ=5.0
+# seed=23 t=2.677
+
+0 0 0 1 0 0 0 1 0 0 0 0
+0 0 0 0 1 0 1 0 0 0 0 0
+0 0 0 0 0 0 0 0 0 0 1 1
+0 0 0 0 0 0 0 0 0 1 1 0
+0 0 1 0 0 1 0 0 0 0 0 0
+0 0 0 0 0 0 0 0 0 1 0 1
+1 0 0 0 0 0 0 0 1 0 0 0
+0 0 0 1 1 0 0 0 0 0 0 0
+0 1 1 0 0 0 0 0 0 0 0 0
+0 0 0 0 0 0 0 1 1 0 0 0
+0 1 0 0 0 1 0 0 0 0 0 0
+1 0 0 0 0 0 1 0 0 0 0 0
+
+# SUMMARY
+# Total configs tested: 54
+# Seeds per config: 50
+# Total runs: 2700
+# Configs with valid solutions: 9
+# Total valid solutions: 25
+# Success rate: 0.9%
