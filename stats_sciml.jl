@@ -357,8 +357,8 @@ end
 function race_search(n::Int;
                      k::Int = 2n,
                      α_list = [50.0, 100.0, 200.0],
-                     β_list = [2.0, 5.0, 10.0],
-                     λ_list = [5.0, 10.0, 20.0],
+                     β_list = [5.0, 10.0],
+                     λ_list = [10.0, 20.0],
                      ρ_list = [5.0, 10.0],
                      n_seeds::Int = 200,
                      master_seed::Int = 42,
@@ -447,8 +447,8 @@ end
 function race_search_parallel(n::Int;
                                k::Int = 2n,
                                α_list = [50.0, 100.0, 200.0],
-                               β_list = [2.0, 5.0, 10.0],
-                               λ_list = [5.0, 10.0, 20.0],
+                               β_list = [5.0, 10.0],
+                               λ_list = [10.0, 20.0],
                                ρ_list = [5.0, 10.0],
                                n_seeds::Int = 200,
                                master_seed::Int = 42,
