@@ -63,10 +63,11 @@ function _generate_lines_csr(n::Int)
     @inline idx(i, j) = (i - 1) * n + j
     
     dirs = Set{Tuple{Int,Int}}()
-    for dx in 0:n-1, dy in 0:n-1
+    for dx in -n+1:n-1, dy in -n+1:n-1
         (dx == 0 && dy == 0) && continue
-        g = gcd(dx, dy)
+        g = gcd(abs(dx), abs(dy))
         dxp, dyp = dx ÷ g, dy ÷ g
+        # Normalize: ensure unique representation (only one of each direction and its opposite)
         if dxp > 0 || (dxp == 0 && dyp > 0)
             push!(dirs, (dxp, dyp))
         end
