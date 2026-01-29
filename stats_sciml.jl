@@ -515,7 +515,7 @@ function race_search_parallel(n::Int;
     
     aggregator = @async begin
         job_num = 0
-        while !solution_found[] || isready(results)
+        while !solution_found[] && isready(results)
             # Poll for result availability
             if !isready(results)
                 sleep(0.001)
@@ -547,18 +547,22 @@ function race_search_parallel(n::Int;
     
     # Wait for completion (with early stop support)
     if early_stop
-        # When early_stop is enabled, don't wait for producer to finish all jobs
-        # Just wait for workers and aggregator to complete after solution_found is set
-        while !solution_found[]
+        # When early_stop is enabled, wait for solution OR all jobs completed
+        while !solution_found[] && jobs_completed[] < total_jobs
             sleep(0.01)
         end
-        # Give workers time to exit their polling loops
-        sleep(0.1)
-        # Close channels to unblock any waiting tasks
+        # Close jobs channel to unblock producer if it's waiting
         close(jobs)
+        # Give workers time to finish their current jobs
+        sleep(0.1)
+        # Close results channel
         close(results)
-        # Wait for tasks with timeout
-        @async (sleep(5); close(jobs); close(results))
+        # Wait for tasks with timeout (don't block forever)
+        @async begin
+            sleep(10)
+            close(jobs)
+            close(results)
+        end
         try
             wait(producer)
         catch
@@ -605,25 +609,9 @@ function worker_task_opt(jobs, results, n, k, line_ptr, line_idx, nlines,
     # Print progress every ~5% (20 updates total)
     progress_interval = max(1, div(total_jobs, 20))
     
-    while !solution_found[]
+    for job in jobs
         # Check early termination
         early_stop && solution_found[] && break
-        
-        # Poll for job availability (avoid blocking on take! which hangs after early_stop)
-        if !isready(jobs)
-            sleep(0.001)  # Small sleep to avoid busy-waiting
-            continue
-        end
-        
-        # Take job (should not block now)
-        job = try
-            take!(jobs)
-        catch e
-            if isa(e, InvalidStateException) || !isopen(jobs)
-                break  # Channel closed, no more jobs
-            end
-            rethrow(e)
-        end
         
         # Update parameters (reuse buffers)
         update_params!(p, job.α, job.β, job.λ, job.ρ)
