@@ -271,30 +271,45 @@ function solve_n3l(p::N3LProblem{T};
     p.last_energy = energy(u0, p)
     state = ConvergenceState(p.last_energy)
     
-    # Success callback: uses cached energy (updated after each RHS call)
+    # Success callback: check violations on thresholded board
+    function success_condition(u, t, int)
+        board = threshold_board(u, int.p.n)
+        nviol = count_violations_csr(board, int.p.line_ptr, int.p.line_idx)
+        npts = sum(board)
+        return nviol == 0 && npts == int.p.k  # Must have exactly k points with 0 violations
+    end
     cb_success = DiscreteCallback(
-        (u, t, int) -> int.p.last_energy ≤ tol,
+        success_condition,
         terminate!;
         save_positions = (false, false)
     )
     
-    # Stall detection via DiscreteCallback with time-based condition
+    # Stall detection: track best (lowest) violation count
     last_check_t = Ref(zero(T))
+    best_violations = Ref(Int(1000000))
+    last_improve_t = Ref(zero(T))
+    
     function stall_condition(u, t, int)
         t - last_check_t[] ≥ check_dt
     end
+    
     function stall_affect!(int)
         last_check_t[] = int.t
-        E = int.p.last_energy
-        if E < 0.999 * state.best_energy
-            state.best_energy = E
-            state.last_improve_t = int.t
+        board = threshold_board(int.u, int.p.n)
+        nviol = count_violations_csr(board, int.p.line_ptr, int.p.line_idx)
+        
+        if nviol < best_violations[]
+            best_violations[] = nviol
+            last_improve_t[] = int.t
         end
-        if int.t - state.last_improve_t > patience && state.best_energy > tol
+        
+        # Stall if no improvement in violations for 'patience' seconds
+        if int.t - last_improve_t[] > patience && best_violations[] > 0
             terminate!(int)
         end
         nothing
     end
+    
     cb_stall = DiscreteCallback(stall_condition, stall_affect!; 
                                 save_positions = (false, false))
     
