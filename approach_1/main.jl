@@ -23,6 +23,31 @@ using Dates
 using ArgParse
 
 # ============================================================================
+# Deterministic RNG Helpers
+# ============================================================================
+
+@inline function splitmix64(x::UInt64)
+    x += 0x9e3779b97f4a7c15
+    z = x
+    z = (z ⊻ (z >> 30)) * 0xbf58476d1ce4e5b9
+    z = (z ⊻ (z >> 27)) * 0x94d049bb133111eb
+    return z ⊻ (z >> 31)
+end
+
+# ============================================================================
+# Top-k Mask Helper (for candidate evaluation)
+# ============================================================================
+
+function topk_mask(x::AbstractVector{<:Real}, k::Int)
+    idx = partialsortperm(x, 1:k; rev=true)
+    m = falses(length(x))
+    @inbounds for i in idx
+        m[i] = true
+    end
+    return BitVector(m)
+end
+
+# ============================================================================
 # Configuration
 # ============================================================================
 
@@ -225,20 +250,20 @@ function run_trajectory(cfg::Config, triples, global_success::Ref{Bool}, rng)
         x = integrator.u
         t = integrator.t
         
-        x_bin = binarize(x, cfg.τ)
-        pts = sum(x_bin)
+        # Evaluate using top-k mask (not threshold)
+        x_bin = topk_mask(x, target)
         viols = count_violations(x_bin, triples)
         
-        # Success?
-        if pts == target && viols == 0
+        # Success? (only check violations, pts is guaranteed)
+        if viols == 0
             status[] = SUCCESS
             terminate!(integrator)
             return
         end
         
-        # Track energy
+        # Track energy (numerically stable)
         E = energy(x, triples, cfg)
-        if E >= last_energy[]
+        if E > last_energy[] - 1e-8
             stall_count[] += 1
         else
             stall_count[] = 0
@@ -260,14 +285,14 @@ function run_trajectory(cfg::Config, triples, global_success::Ref{Bool}, rng)
     sol = solve(prob, Tsit5(); abstol=1e-6, reltol=1e-4, callback=cb,
                 save_everystep=false, save_start=false, maxiters=1_000_000)
     
-    # Final check
+    # Final check using top-k mask
     x_final = sol.u[end]
-    x_bin = binarize(x_final, cfg.τ)
-    pts = sum(x_bin)
+    x_bin = topk_mask(x_final, target)
     viols = count_violations(x_bin, triples)
+    pts = target  # guaranteed by topk_mask
     
     if status[] == RUNNING
-        status[] = (pts == target && viols == 0) ? SUCCESS : TIMEOUT
+        status[] = (viols == 0) ? SUCCESS : TIMEOUT
     end
     
     return status[], x_bin, pts, viols
@@ -303,8 +328,9 @@ function solve_n3l(n::Int, R::Int, T::Float64, seed::UInt64, outdir::String; ver
     Threads.@threads for id in 1:R
         global_success[] && continue
         
-        # Deterministic RNG: hash(seed, n, id) ensures reproducibility
-        rng = Xoshiro(hash((seed, n, id)))
+        # Deterministic RNG using splitmix64 (no Julia hash salt)
+        traj_seed = splitmix64(seed ⊻ UInt64(n) ⊻ (UInt64(id) << 1))
+        rng = Xoshiro(traj_seed)
         status, x_bin, pts, viols = run_trajectory(cfg, triples, global_success, rng)
         
         lock(result_lock) do
