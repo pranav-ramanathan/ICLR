@@ -6,9 +6,10 @@ Scientific Machine Learning approach to No-Three-In-Line problem.
 Gradient flow dynamics with parallel search and early termination.
 
 Usage:
-    julia --threads=12 n3l_solver.jl           # Run n=3 to 20
-    julia --threads=12 n3l_solver.jl 10        # Single grid size
-    julia --threads=12 n3l_solver.jl 3 15      # Range n=3 to n=15
+    julia --threads=12 main.jl 10              # Single grid size
+    julia --threads=12 main.jl 10 --R 200      # Custom trajectories
+    julia --threads=12 main.jl 10 --seed 42    # Reproducible run
+    julia --threads=12 main.jl --help          # Show help
 
 Author: Sandy
 Style: Chris Rackauckas / SciML conventions
@@ -19,6 +20,7 @@ using DiffEqCallbacks
 using Random
 using Printf
 using Dates
+using ArgParse
 
 # ============================================================================
 # Configuration
@@ -33,6 +35,45 @@ Base.@kwdef struct Config
     α::Float64 = 10.0 * (n / 6)         # Collinearity penalty (scales with n)
     β::Float64 = 1.0                    # Point count reward
     γ::Float64 = 5.0                    # Binary regularization
+end
+
+# ============================================================================
+# CLI Argument Parsing
+# ============================================================================
+
+function parse_cli_args(args)
+    s = ArgParseSettings(
+        description = "N3L Solver - No-Three-In-Line problem solver using SciML",
+        version = "1.0.0",
+        add_version = true
+    )
+    
+    @add_arg_table! s begin
+        "n"
+            help = "Board size (n x n grid)"
+            arg_type = Int
+            required = true
+        "--R"
+            help = "Number of parallel trajectories"
+            arg_type = Int
+            default = 200
+        "--T"
+            help = "Max integration time in seconds"
+            arg_type = Float64
+            default = 15.0
+        "--seed"
+            help = "Random seed for reproducibility (auto-generated if not provided)"
+            arg_type = UInt64
+        "--outdir"
+            help = "Output directory base path"
+            arg_type = String
+            default = "solutions"
+        "--quiet", "-q"
+            help = "Suppress most output"
+            action = :store_true
+    end
+    
+    return parse_args(args, s)
 end
 
 # ============================================================================
@@ -243,13 +284,14 @@ end
 # Parallel Search
 # ============================================================================
 
-function solve_n3l(n::Int; R::Int=100, T::Float64=10.0, verbose::Bool=true)
+function solve_n3l(n::Int, R::Int, T::Float64, seed::UInt64, outdir::String; verbose::Bool=true)
     cfg = Config(n=n, R=R, T=T)
     target = 2n
     
     verbose && println("="^50)
     verbose && @printf("N3L Solver: n=%d, target=%d points\n", n, target)
     verbose && @printf("R=%d trajectories, T=%.1fs, threads=%d\n", R, T, Threads.nthreads())
+    verbose && @printf("seed=%d\n", seed)
     
     # Precompute triples
     triples = compute_triples(n)
@@ -264,11 +306,12 @@ function solve_n3l(n::Int; R::Int=100, T::Float64=10.0, verbose::Bool=true)
     
     start_time = time()
     
-    # Parallel search
+    # Parallel search with deterministic RNG per worker
     Threads.@threads for id in 1:R
         global_success[] && continue
         
-        rng = Xoshiro(id + round(Int, time() * 1000))
+        # Deterministic RNG: hash(seed, n, id) ensures reproducibility
+        rng = Xoshiro(hash((seed, n, id)))
         status, x_bin, pts, viols = run_trajectory(cfg, triples, global_success, rng)
         
         lock(result_lock) do
@@ -295,13 +338,13 @@ function solve_n3l(n::Int; R::Int=100, T::Float64=10.0, verbose::Bool=true)
         verbose && @printf("Time: %.3fs\n", elapsed)
         verbose && println("Grid:")
         print_grid(grid)
-        save_solution(n, grid)
-        return true, grid, elapsed, stats
+        save_solution(n, grid, R, T, seed, outdir)
+        return true, grid, elapsed, stats, seed
     else
         verbose && println("FAILED")
         verbose && @printf("Stats: %s\n", stats)
         verbose && @printf("Time: %.3fs\n", elapsed)
-        return false, nothing, elapsed, stats
+        return false, nothing, elapsed, stats, seed
     end
 end
 
@@ -317,70 +360,29 @@ function print_grid(grid)
 end
 
 # ============================================================================
-# Batch Solver
-# ============================================================================
-
-function solve_batch(n_range; R::Int=100, T::Float64=10.0)
-    println("\n" * "="^50)
-    println("N3L BATCH SOLVER")
-    println("="^50)
-    
-    results = []
-    max_solved = 0
-    
-    for n in n_range
-        # Scale parameters
-        R_n = min(R * (1 + (n - 6) ÷ 4), 500)
-        T_n = T * (1 + (n - 6) / 10)
-        
-        success, grid, elapsed, stats = solve_n3l(n; R=R_n, T=T_n, verbose=true)
-        push!(results, (n=n, success=success, grid=grid, time=elapsed))
-        
-        if success
-            max_solved = n
-            save_solution(n, grid)
-        else
-            println("\n⚠ Stopping: failed at n=$n")
-            break
-        end
-        println()
-    end
-    
-    # Summary
-    println("="^50)
-    println("SUMMARY")
-    println("="^50)
-    @printf("%-6s %-10s %-10s\n", "n", "Status", "Time (s)")
-    println("-"^30)
-    for r in results
-        status = r.success ? "✓" : "✗"
-        @printf("%-6d %-10s %-10.3f\n", r.n, status, r.time)
-    end
-    println("-"^30)
-    @printf("Max solved: n=%d\n", max_solved)
-    @printf("Total time: %.2fs\n", sum(r.time for r in results))
-    println("="^50)
-    
-    return results, max_solved
-end
-
-# ============================================================================
 # Save Solution
 # ============================================================================
 
-function save_solution(n, grid)
+function save_solution(n, grid, R, T, seed, outdir)
     timestamp = Dates.format(now(), "yyyymmdd_HHMMSS")
-    dir = "solutions/$(n)"
+    dir = "$(outdir)/$(n)"
     mkpath(dir)
     filename = "$(dir)/sol_$(timestamp).txt"
     
     open(filename, "w") do io
-        println(io, "# N3L Solution: n=$n, points=$(2n)")
-        println(io, "# Generated: $(now())")
+        println(io, "# n=$(n)")
+        println(io, "# target=$(2n)")
+        println(io, "# R=$(R)")
+        println(io, "# T=$(T)")
+        println(io, "# seed=$(seed)")
+        println(io, "# timestamp=$(Dates.format(now(), "yyyy-mm-ddTHH:MM:SSZ"))")
+        println(io, "#")
+        println(io, "# Grid (0/1):")
         for i in 1:n
             println(io, join(Int.(grid[i, :]), " "))
         end
-        println(io, "\n# Coordinates (row, col):")
+        println(io, "#")
+        println(io, "# Coordinates (row, col):")
         for i in 1:n, j in 1:n
             grid[i,j] && println(io, "($i, $j)")
         end
@@ -394,21 +396,32 @@ end
 # ============================================================================
 
 function main()
-    if length(ARGS) == 0
-        # Default: n=3 to 20
-        solve_batch(3:20; R=100, T=10.0)
-    elseif length(ARGS) == 1
-        # Single n
-        n = parse(Int, ARGS[1])
-        solve_n3l(n; R=200, T=15.0)
+    args = parse_cli_args(ARGS)
+    
+    n = args["n"]
+    R = args["R"]
+    T = args["T"]
+    outdir = args["outdir"]
+    quiet = args["quiet"]
+    verbose = !quiet
+    
+    # Generate or use provided seed
+    seed = if isnothing(args["seed"])
+        rand(RandomDevice(), UInt64)
     else
-        # Range
-        n_start = parse(Int, ARGS[1])
-        n_end = parse(Int, ARGS[2])
-        solve_batch(n_start:n_end; R=100, T=10.0)
+        args["seed"]
     end
+    
+    success, grid, elapsed, stats, used_seed = solve_n3l(n, R, T, seed, outdir; verbose=verbose)
+    
+    if success
+        println()
+        println("Reproduce: julia --project=. main.jl $(n) --R $(R) --T $(T) --seed $(used_seed)")
+    end
+    
+    return success ? 0 : 1
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    main()
+    exit(main())
 end
