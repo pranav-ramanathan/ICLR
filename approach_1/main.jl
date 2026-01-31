@@ -201,7 +201,7 @@ end
 # Single Trajectory
 # ============================================================================
 
-@enum Status RUNNING SUCCESS HOPELESS STUCK TIMEOUT
+@enum Status RUNNING SUCCESS STUCK TIMEOUT
 
 function run_trajectory(cfg::Config, triples, global_success::Ref{Bool}, rng)
     N = cfg.n^2
@@ -244,13 +244,6 @@ function run_trajectory(cfg::Config, triples, global_success::Ref{Bool}, rng)
             stall_count[] = 0
         end
         last_energy[] = E
-        
-        # Hopeless? (too few points, stalling)
-        if pts < target - cfg.n ÷ 2 && stall_count[] >= 3 && t > cfg.T / 4
-            status[] = HOPELESS
-            terminate!(integrator)
-            return
-        end
         
         # Stuck? (violations persist)
         if viols > 0 && stall_count[] >= 5 && t > 0.6 * cfg.T
@@ -302,7 +295,7 @@ function solve_n3l(n::Int, R::Int, T::Float64, seed::UInt64, outdir::String; ver
     global_success = Ref(false)
     result_grid = Ref{Union{Nothing, BitVector}}(nothing)
     result_lock = ReentrantLock()
-    stats = Dict(:success=>0, :hopeless=>0, :stuck=>0, :timeout=>0)
+    stats = Dict(:success=>0, :stuck=>0, :timeout=>0)
     
     start_time = time()
     
@@ -322,7 +315,6 @@ function solve_n3l(n::Int, R::Int, T::Float64, seed::UInt64, outdir::String; ver
             end
             
             key = status == SUCCESS ? :success : 
-                  status == HOPELESS ? :hopeless :
                   status == STUCK ? :stuck : :timeout
             stats[key] += 1
         end
