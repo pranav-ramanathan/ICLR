@@ -1,0 +1,19 @@
+# n=4 k=8
+# points=8 violations=0
+# E=9.90732870163622e-7
+# time=1.49s
+# cfg: α=50.0 β=5.0 λ=10.0 ρ=5.0
+# seed=2010107130 t=2.579
+
+0 0 1 1
+1 1 0 0
+0 0 1 1
+1 1 0 0
+
+# SUMMARY
+# Total configs tested: 24
+# Seeds per config: 50
+# Total runs: 1200
+# Configs with valid solutions: 1
+# Total valid solutions: 1
+# Success rate: 0.1%

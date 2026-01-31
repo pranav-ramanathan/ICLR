@@ -1,0 +1,10 @@
+# N3L Solution: n=2, points=4
+# Generated: 2026-01-31T19:37:15.514
+1 1
+1 1
+
+# Coordinates (row, col):
+(1, 1)
+(1, 2)
+(2, 1)
+(2, 2)
