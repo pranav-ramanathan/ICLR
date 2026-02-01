@@ -1,0 +1,19 @@
+# n=3
+# target=6
+# seed=3
+# violations=0
+# energy=0.0
+# timestamp=2026-02-01'T'22:04:19'Z'
+#
+# Grid (0/1):
+1 1 0
+1 0 1
+0 1 1
+# 
+# Coordinates (row, col):
+(1, 1)
+(1, 2)
+(2, 1)
+(2, 3)
+(3, 2)
+(3, 3)
