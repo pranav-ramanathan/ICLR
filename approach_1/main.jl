@@ -57,9 +57,9 @@ Base.@kwdef struct Config
     T::Float64 = 10.0                   # Max integration time
     τ::Float64 = 0.5                    # Binarization threshold
     check_interval::Float64 = 0.1       # Early termination check frequency
-    α::Float64 = 10.0 * (n / 6)         # Collinearity penalty (scales with n)
+    α::Float64 = n <= 10 ? 10.0 * (n / 6) : 40.0  # Collinearity penalty (much higher for n>=11)
     β::Float64 = 1.0                    # Point count reward
-    γ::Float64 = 5.0                    # Binary regularization
+    γ::Float64 = n <= 10 ? 5.0 : 15.0   # Binary regularization (stronger for n>=11)
 end
 
 # ============================================================================
@@ -228,7 +228,7 @@ end
 
 @enum Status RUNNING SUCCESS STUCK TIMEOUT
 
-function run_trajectory(cfg::Config, triples, global_success::Ref{Bool}, rng)
+function run_trajectory(cfg::Config, triples, global_success::Ref{Bool}, rng, traj_seed::UInt64)
     N = cfg.n^2
     target = 2 * cfg.n
     
@@ -250,11 +250,11 @@ function run_trajectory(cfg::Config, triples, global_success::Ref{Bool}, rng)
         x = integrator.u
         t = integrator.t
         
-        # Evaluate using top-k mask (not threshold)
+        # Evaluate using top-k mask with multiple k values
         x_bin = topk_mask(x, target)
         viols = count_violations(x_bin, triples)
         
-        # Success? (only check violations, pts is guaranteed)
+        # Success? (must have exactly target points with no violations)
         if viols == 0
             status[] = SUCCESS
             terminate!(integrator)
@@ -270,11 +270,34 @@ function run_trajectory(cfg::Config, triples, global_success::Ref{Bool}, rng)
         end
         last_energy[] = E
         
-        # Stuck? (violations persist)
-        if viols > 0 && stall_count[] >= 5 && t > 0.6 * cfg.T
-            status[] = STUCK
-            terminate!(integrator)
-            return
+        # Stuck? (violations persist) - try aggressive perturbation restart
+        if viols > 0 && stall_count[] >= 5 && t > 0.5 * cfg.T
+            # Aggressive perturbation to escape local minimum
+            u_modified = false
+            perturb_scale = 0.25 + 0.1 * rand(rng)  # Random scale 0.25-0.35
+            
+            @inbounds for i in eachindex(integrator.u)
+                # Perturb all values, not just mid-range
+                if integrator.u[i] > 0.05 && integrator.u[i] < 0.95
+                    integrator.u[i] += perturb_scale * (2.0 * rand(rng) - 1.0)
+                    integrator.u[i] = clamp(integrator.u[i], 0.0, 1.0)
+                    u_modified = true
+                end
+            end
+            
+            if u_modified
+                # Reset tracking and continue with fresh RNG
+                stall_count[] = 0
+                last_energy[] = Inf
+                # Re-seed RNG with new value to get different trajectory
+                rng = Xoshiro(splitmix64(traj_seed ⊻ UInt64(round(Int, t * 1000))))
+                return
+            else
+                # No perturbable values, truly stuck
+                status[] = STUCK
+                terminate!(integrator)
+                return
+            end
         end
     end
     
@@ -285,7 +308,7 @@ function run_trajectory(cfg::Config, triples, global_success::Ref{Bool}, rng)
     sol = solve(prob, Tsit5(); abstol=1e-6, reltol=1e-4, callback=cb,
                 save_everystep=false, save_start=false, maxiters=1_000_000)
     
-    # Final check using top-k mask
+    # Final check using top-k mask (must have exactly target points)
     x_final = sol.u[end]
     x_bin = topk_mask(x_final, target)
     viols = count_violations(x_bin, triples)
@@ -331,7 +354,7 @@ function solve_n3l(n::Int, R::Int, T::Float64, seed::UInt64, outdir::String; ver
         # Deterministic RNG using splitmix64 (no Julia hash salt)
         traj_seed = splitmix64(seed ⊻ UInt64(n) ⊻ (UInt64(id) << 1))
         rng = Xoshiro(traj_seed)
-        status, x_bin, pts, viols = run_trajectory(cfg, triples, global_success, rng)
+        status, x_bin, pts, viols = run_trajectory(cfg, triples, global_success, rng, traj_seed)
         
         lock(result_lock) do
             if status == SUCCESS && !global_success[]
