@@ -1,9 +1,9 @@
 #!/usr/bin/env julia
 #=
-N3L Pure Gradient Flow Baseline
-================================
-Clean implementation without perturbations.
-This will be our baseline to compare UDE approach against.
+N3L Pure Gradient Flow Baseline - ACCURATE STATISTICS VERSION
+==============================================================
+Removes global early termination to get true success rates.
+All trajectories complete to measure real performance.
 =#
 
 using OrdinaryDiffEq
@@ -58,7 +58,7 @@ end
 
 function parse_cli_args(args)
     s = ArgParseSettings(
-        description = "N3L Pure Gradient Flow Baseline",
+        description = "N3L Pure Gradient Flow Baseline - Accurate Statistics",
         version = "1.0.0",
         add_version = true
     )
@@ -208,12 +208,12 @@ function make_rhs(triples, cfg::Config)
 end
 
 # ============================================================================
-# Single Trajectory - SIMPLIFIED
+# Single Trajectory - NO GLOBAL TERMINATION
 # ============================================================================
 
 @enum Status RUNNING SUCCESS TIMEOUT
 
-function run_trajectory(cfg::Config, triples, global_success::Ref{Bool}, rng)
+function run_trajectory(cfg::Config, triples, rng)  # Removed global_success parameter
     N = cfg.n^2
     target = 2 * cfg.n
     
@@ -222,17 +222,15 @@ function run_trajectory(cfg::Config, triples, global_success::Ref{Bool}, rng)
     
     rhs! = make_rhs(triples, cfg)
     
-    # Simple early success check only
+    # Check for success, but only terminate THIS trajectory
     function check!(integrator)
-        global_success[] && (terminate!(integrator); return)
-        
         x = integrator.u
         x_bin = topk_mask(x, target)
         viols = count_violations(x_bin, triples)
         
         if viols == 0
             status[] = SUCCESS
-            terminate!(integrator)
+            terminate!(integrator)  # Only this trajectory stops
         end
     end
     
@@ -255,7 +253,7 @@ function run_trajectory(cfg::Config, triples, global_success::Ref{Bool}, rng)
 end
 
 # ============================================================================
-# Parallel Search
+# Parallel Search - ALL TRAJECTORIES COMPLETE
 # ============================================================================
 
 function solve_n3l(n::Int, R::Int, T::Float64, seed::UInt64, outdir::String; 
@@ -270,79 +268,86 @@ function solve_n3l(n::Int, R::Int, T::Float64, seed::UInt64, outdir::String;
     target = 2n
     
     verbose && println("="^50)
-    verbose && @printf("N3L Pure Gradient Flow Baseline\n")
+    verbose && @printf("N3L Pure Gradient Flow - ACCURATE STATS\n")
     verbose && @printf("n=%d, target=%d points\n", n, target)
     verbose && @printf("R=%d trajectories, T=%.1fs, threads=%d\n", R, T, Threads.nthreads())
     verbose && @printf("Hyperparameters: α=%.1f, β=%.1f, γ=%.1f\n", cfg.α, cfg.β, cfg.γ)
     verbose && @printf("seed=%d\n", seed)
+    verbose && println("NOTE: All trajectories run to completion for accurate statistics")
     
     triples = compute_triples(n)
     verbose && @printf("Collinear triples: %d\n", length(triples))
     verbose && println("-"^50)
     
-    global_success = Ref(false)
-    result_grid = Ref{Union{Nothing, BitVector}}(nothing)
-    result_lock = ReentrantLock()
-    stats = Dict(:success=>0, :timeout=>0)
-    
-    # Track violation statistics
-    violation_lock = ReentrantLock()
-    violation_history = Int[]
+    # Store all results
+    results_lock = ReentrantLock()
+    all_results = Tuple{Status, BitVector, Int}[]  # (status, grid, violations)
     
     start_time = time()
     
+    # Let ALL trajectories complete - no early termination
     Threads.@threads for id in 1:R
-        global_success[] && continue
-        
         traj_seed = splitmix64(seed ⊻ UInt64(n) ⊻ (UInt64(id) << 1))
         rng = Xoshiro(traj_seed)
-        status, x_bin, viols = run_trajectory(cfg, triples, global_success, rng)
+        status, x_bin, viols = run_trajectory(cfg, triples, rng)
         
-        lock(result_lock) do
-            if status == SUCCESS && !global_success[]
-                global_success[] = true
-                result_grid[] = x_bin
-                verbose && @printf("  ✓ Worker %d found solution (%.2fs)\n", id, time()-start_time)
-            end
+        lock(results_lock) do
+            push!(all_results, (status, x_bin, viols))
             
-            key = status == SUCCESS ? :success : :timeout
-            stats[key] += 1
-        end
-        
-        lock(violation_lock) do
-            push!(violation_history, viols)
+            # Progress reporting for first few successes
+            if status == SUCCESS && count(r -> r[1] == SUCCESS, all_results) <= 5
+                verbose && @printf("  ✓ Worker %d found solution #%d (%.2fs, %d violations final check)\n", 
+                                  id, count(r -> r[1] == SUCCESS, all_results), time()-start_time, viols)
+            end
         end
     end
     
     elapsed = time() - start_time
     
-    # Statistics
+    # Calculate ACCURATE statistics
+    successes = count(r -> r[1] == SUCCESS, all_results)
+    timeouts = count(r -> r[1] == TIMEOUT, all_results)
+    violation_history = [r[3] for r in all_results]
+    
     verbose && println("-"^50)
-    verbose && println("STATISTICS:")
-    verbose && @printf("  Success: %d/%d (%.1f%%)\n", stats[:success], R, 100*stats[:success]/R)
+    verbose && println("ACCURATE STATISTICS (all trajectories completed):")
+    verbose && @printf("  Total runs: %d\n", R)
+    verbose && @printf("  Successes: %d (%.2f%%)\n", successes, 100*successes/R)
+    verbose && @printf("  Timeouts: %d (%.2f%%)\n", timeouts, 100*timeouts/R)
     
     if !isempty(violation_history)
         sorted_viols = sort(violation_history)
         verbose && println("  Violation distribution:")
         verbose && @printf("    Min: %d\n", minimum(sorted_viols))
+        verbose && @printf("    25th percentile: %d\n", sorted_viols[max(1, div(length(sorted_viols), 4))])
         verbose && @printf("    Median: %d\n", sorted_viols[div(length(sorted_viols), 2)])
+        verbose && @printf("    75th percentile: %d\n", sorted_viols[max(1, 3*div(length(sorted_viols), 4))])
         verbose && @printf("    Max: %d\n", maximum(sorted_viols))
         
         close_calls = count(v -> v <= 5, sorted_viols)
-        verbose && @printf("  Close calls (≤5 violations): %d (%.1f%%)\n", 
+        very_close = count(v -> v <= 2, sorted_viols)
+        verbose && @printf("  Close calls (≤5 violations): %d (%.2f%%)\n", 
                           close_calls, 100*close_calls/length(sorted_viols))
+        verbose && @printf("  Very close (≤2 violations): %d (%.2f%%)\n", 
+                          very_close, 100*very_close/length(sorted_viols))
     end
     
     verbose && println("-"^50)
     
-    if global_success[]
-        grid = reshape(result_grid[], (n, n))
+    if successes > 0
+        # Save first solution found
+        first_success_idx = findfirst(r -> r[1] == SUCCESS, all_results)
+        _, first_grid, _ = all_results[first_success_idx]
+        grid = reshape(first_grid, (n, n))
+        
         verbose && println("✓✓✓ SUCCESS ✓✓✓")
-        verbose && @printf("Time: %.3fs\n", elapsed)
-        verbose && println("Grid:")
+        verbose && @printf("Found %d solution%s in %.3fs\n", successes, successes > 1 ? "s" : "", elapsed)
+        verbose && @printf("Success rate: %.2f%%\n", 100*successes/R)
+        verbose && println("\nFirst solution:")
         print_grid(grid)
         save_solution(n, grid, R, T, seed, outdir)
-        return true, grid, elapsed, stats, seed
+        
+        return true, grid, elapsed, Dict(:success=>successes, :timeout=>timeouts), seed
     else
         verbose && println("✗✗✗ FAILED ✗✗✗")
         verbose && @printf("Time: %.3fs\n", elapsed)
@@ -350,10 +355,9 @@ function solve_n3l(n::Int, R::Int, T::Float64, seed::UInt64, outdir::String;
         if !isempty(violation_history)
             min_viol = minimum(violation_history)
             verbose && @printf("\nBest achieved: %d violations\n", min_viol)
-            verbose && println("This is the baseline for UDE to improve upon.")
         end
         
-        return false, nothing, elapsed, stats, seed
+        return false, nothing, elapsed, Dict(:success=>0, :timeout=>timeouts), seed
     end
 end
 
@@ -410,7 +414,7 @@ function main()
     n = args["n"]
     R = args["R"]
     T = args["T"]
-    alpha_override = args["alpha"]  # Will be nothing if not provided
+    alpha_override = args["alpha"]
     outdir = args["outdir"]
     quiet = args["quiet"]
     verbose = !quiet
