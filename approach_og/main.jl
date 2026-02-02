@@ -1,6 +1,7 @@
 using OrdinaryDiffEq, ForwardDiff
 using LinearAlgebra, Random, Statistics
 using Dates, Printf
+using DiffEqCallbacks
 
 # -------------------------------
 # Grid & collinearity setup
@@ -8,6 +9,11 @@ using Dates, Printf
 const n = 8
 const N = n * n
 const target_points = 2 * n  # Want exactly 2n points
+
+# CRITICAL FIX: Much stronger collinearity penalty
+const α = 200.0  # Was 13.33, now 200.0!
+const β = 50.0   # Point count penalty
+const γ = 5.0    # Binary regularization
 
 linear_index(i, j) = (i - 1) * n + j
 
@@ -34,9 +40,21 @@ const L_triples = compute_collinear_triples(n)
 println("Found $(length(L_triples)) collinear triples for n=$n")
 
 # -------------------------------
+# Top-K mask (guarantees exactly k points)
+# -------------------------------
+function topk_mask(x::AbstractVector{<:Real}, k::Int)
+    idx = partialsortperm(x, 1:k; rev=true)
+    m = falses(length(x))
+    @inbounds for i in idx
+        m[i] = true
+    end
+    return BitVector(m)
+end
+
+# -------------------------------
 # Better energy function
 # -------------------------------
-function energy(x; α=100.0, β=10.0, γ=2.0)
+function energy(x; α=α, β=β, γ=γ)
     # Collinearity penalty - STRONG
     E_col = α * sum((x[i1] * x[i2] * x[i3] for (i1, i2, i3) in L_triples))
     
@@ -51,7 +69,7 @@ function energy(x; α=100.0, β=10.0, γ=2.0)
 end
 
 # -------------------------------
-# Pure gradient flow (no noise)
+# Pure gradient flow
 # -------------------------------
 function f!(dx, x, p, t)
     α, β, γ = p
@@ -67,63 +85,124 @@ function f!(dx, x, p, t)
 end
 
 # -------------------------------
-# Smart initialization
+# Better initialization (Beta-like distribution)
 # -------------------------------
-function smart_init(n; target_points=2n)
+function biased_init(n; target_points=2n)
     N = n * n
-    density = target_points / N
-    # Start near target density with noise
-    x0 = fill(density, N) .+ 0.2 * randn(N)
-    clamp!(x0, 0.0, 1.0)
+    target_density = target_points / N
+    
+    # Beta-like distribution centered at target density
+    a = max(0.5, 2.0 * target_density)
+    b = max(0.5, 2.0 * (1.0 - target_density))
+    
+    x0 = Vector{Float64}(undef, N)
+    @inbounds for i in 1:N
+        u = rand()^(1/a)
+        v = rand()^(1/b)
+        x0[i] = u / (u + v)
+    end
     return x0
 end
 
 # -------------------------------
-# Validation
+# Validation using top-k (always returns exactly target_points)
 # -------------------------------
-function count_violations(x; threshold=0.5)
-    x_bin = x .>= threshold
+function count_violations(x; k=target_points)
+    x_bin = topk_mask(x, k)
     violations = 0
     for (i1, i2, i3) in L_triples
         if x_bin[i1] && x_bin[i2] && x_bin[i3]
             violations += 1
         end
     end
-    return violations
+    return violations, x_bin
 end
 
 # -------------------------------
-# Multi-restart strategy
+# Single trajectory with callback
 # -------------------------------
-function solve_with_restarts(n_restarts=10)
-    best_sol = nothing
-    best_violations = Inf
-    best_seed = 0
+function solve_single_trajectory(seed, max_time=100.0)
+    Random.seed!(seed)
+    x0 = biased_init(n)
     
-    for seed in 1:n_restarts
-        Random.seed!(seed)
-        x0 = smart_init(n)
+    # Success flag
+    success_ref = Ref(false)
+    best_x_ref = Ref{Union{Nothing,Vector{Float64}}}(nothing)
+    
+    # CRITICAL: Callback to check top-k violations DURING solve
+    function check_success(integrator)
+        x = integrator.u
+        violations, x_bin = count_violations(x)
         
-        tspan = (0.0, 50.0)
-        p = (100.0, 50.0, 2.0)  # (α, β, γ) - heavy collinearity penalty
-        
-        prob = ODEProblem(f!, x0, tspan, p)
-        sol = solve(prob, Tsit5(); reltol=1e-6, abstol=1e-8)
-        
-        xT = sol[:, end]
-        violations = count_violations(xT)
-        points = sum(Int.(xT .>= 0.5))
-        
-        println("Seed $seed: $points points, $violations violations, E=$(round(energy(xT; α=p[1], β=p[2], γ=p[3]), digits=2))")
-        
-        if violations < best_violations || (violations == best_violations && abs(points - target_points) < abs(sum(Int.(best_sol .>= 0.5)) - target_points))
-            best_violations = violations
-            best_sol = xT
-            best_seed = seed
+        if violations == 0
+            success_ref[] = true
+            best_x_ref[] = copy(x)
+            terminate!(integrator)
+            return
         end
     end
     
-    return best_sol, best_violations, best_seed
+    # Check every 0.5 seconds
+    cb = PeriodicCallback(check_success, 0.5; save_positions=(false, false))
+    
+    tspan = (0.0, max_time)
+    p = (α, β, γ)
+    
+    prob = ODEProblem(f!, x0, tspan, p)
+    sol = solve(prob, Tsit5(); reltol=1e-6, abstol=1e-8, callback=cb,
+                save_everystep=false, maxiters=1_000_000)
+    
+    # Get final result
+    if success_ref[]
+        xT = best_x_ref[]
+    else
+        xT = sol.u[end]
+    end
+    
+    violations, x_bin = count_violations(xT)
+    
+    return success_ref[], xT, violations, x_bin, sol.t[end]
+end
+
+# -------------------------------
+# Multi-restart strategy with early termination
+# -------------------------------
+function solve_with_restarts(n_restarts=50, max_time=100.0)
+    best_sol = nothing
+    best_violations = Inf
+    best_seed = 0
+    best_grid = nothing
+    
+    for seed in 1:n_restarts
+        success, xT, violations, x_bin, time_taken = solve_single_trajectory(seed, max_time)
+        
+        points = sum(x_bin)  # Always equals target_points
+        energy_val = energy(xT; α=α, β=β, γ=γ)
+        
+        status = success ? "✓" : " "
+        println("Seed $seed: $points points, $violations violations, E=$(round(energy_val, digits=2)), t=$(round(time_taken, digits=1))s $status")
+        
+        # Early termination if we find optimal solution
+        if violations == 0
+            println("  ✓✓✓ Found optimal solution! Terminating early.")
+            return xT, violations, seed, x_bin
+        end
+        
+        # Track best solution
+        if best_sol === nothing
+            best_violations = violations
+            best_sol = xT
+            best_seed = seed
+            best_grid = x_bin
+        elseif violations < best_violations
+            best_violations = violations
+            best_sol = xT
+            best_seed = seed
+            best_grid = x_bin
+        end
+    end
+    
+    return best_sol, best_violations, best_seed, best_grid
 end
 
 # -------------------------------
@@ -158,26 +237,44 @@ function save_solution(n, grid, seed, violations, energy_val, outdir="solutions"
 end
 
 # -------------------------------
+# Pretty print grid
+# -------------------------------
+function print_grid(grid)
+    n = size(grid, 1)
+    for i in 1:n
+        print("  ")
+        for j in 1:n
+            print(grid[i,j] ? "● " : "· ")
+        end
+        println()
+    end
+end
+
+# -------------------------------
 # Run optimization
 # -------------------------------
 println("\nRunning multi-restart optimization...")
-best_sol, best_violations, best_seed = solve_with_restarts(20)
+println("Parameters: α=$α, β=$β, γ=$γ")
+println("-"^50)
 
-x_binary = Int.(best_sol .>= 0.5)
-grid = reshape(x_binary, (n, n))
+best_sol, best_violations, best_seed, best_grid = solve_with_restarts(50, 100.0)
+
+grid = reshape(best_grid, (n, n))
 
 println("\n" * "="^50)
 println("BEST SOLUTION (seed $best_seed):")
 println("="^50)
-for i in 1:n
-    println(grid[i, :])
-end
+print_grid(grid)
 
-points_placed = sum(x_binary)
+points_placed = sum(best_grid)
 println("\nPoints placed: $points_placed (target: $target_points)")
 println("Violations: $best_violations")
-energy_val = round(energy(best_sol; α=100.0, β=10.0, γ=2.0), digits=4)
+energy_val = round(energy(best_sol; α=α, β=β, γ=γ), digits=4)
 println("Energy: $energy_val")
 
 # Save solution to file
-save_solution(n, grid, best_seed, best_violations, energy_val)
+if best_violations == 0
+    save_solution(n, grid, best_seed, best_violations, energy_val)
+else
+    println("\n⚠️  No valid solution found. Try increasing α or n_restarts.")
+end

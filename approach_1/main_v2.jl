@@ -1,29 +1,22 @@
 #!/usr/bin/env julia
 #=
-N3L SciML Solver v2
-===================
-Scientific Machine Learning approach to No-Three-In-Line problem.
-Gradient flow dynamics with parallel search, annealing, and local repair.
-
-Usage:
-    julia --threads=12 main.jl 11              # Single grid size
-    julia --threads=12 main.jl 11 --R 500      # Custom trajectories
-    julia --threads=12 main.jl 11 --seed 42    # Reproducible run
-    julia --threads=12 main.jl --help          # Show help
-
-Author: Sandy
-Style: Chris Rackauckas / SciML conventions
+N3L Sparse Solver - DIAGNOSTIC VERSION
+======================================
+Adds detailed logging to understand why n>10 fails
 =#
 
 using OrdinaryDiffEq
 using DiffEqCallbacks
+using SparseArrays
+using LinearAlgebra
 using Random
 using Printf
 using Dates
 using ArgParse
+using Statistics
 
 # ============================================================================
-# Deterministic RNG Helpers
+# [Keep all the helper functions from before: splitmix64, topk_mask, Config, parse_cli_args]
 # ============================================================================
 
 @inline function splitmix64(x::UInt64)
@@ -34,10 +27,6 @@ using ArgParse
     return z ⊻ (z >> 31)
 end
 
-# ============================================================================
-# Top-k Mask Helper
-# ============================================================================
-
 function topk_mask(x::AbstractVector{<:Real}, k::Int)
     idx = partialsortperm(x, 1:k; rev=true)
     m = falses(length(x))
@@ -47,49 +36,38 @@ function topk_mask(x::AbstractVector{<:Real}, k::Int)
     return BitVector(m)
 end
 
-# ============================================================================
-# Configuration
-# ============================================================================
-
 Base.@kwdef struct Config
     n::Int
-    R::Int = 200
-    T::Float64 = 30.0
+    R::Int = 100
+    T::Float64 = 10.0
     τ::Float64 = 0.5
-    check_interval::Float64 = 0.05
-    
-    # Energy coefficients (smooth scaling)
-    α_base::Float64 = 8.0
-    α_scale::Float64 = 1.8               # Grows faster with n
-    β::Float64 = 1.0
-    γ::Float64 = 3.0 + 0.8 * n           # Gradual increase
-    
-    # Annealing settings
-    anneal::Bool = true
-    α_start_mult::Float64 = 0.05         # Start very low
-    α_end_mult::Float64 = 3.0            # End high
-end
-
-function get_α(cfg::Config, t::Float64)
-    α_target = cfg.α_base * (cfg.n / 6)^cfg.α_scale
-    if !cfg.anneal
-        return α_target
+    check_interval::Float64 = 0.1
+    # MUCH MORE AGGRESSIVE SCALING
+    α::Float64 = begin
+        if n <= 10
+            10.0 * (n / 6)
+        elseif n <= 15
+            100.0 * (n / 10)  # 10x increase for n=11-15
+        else
+            200.0 * (n / 10)  # Even more for n>15
+        end
     end
-    progress = clamp(t / cfg.T, 0.0, 1.0)
-    # Smooth S-curve annealing
-    smooth_progress = progress^2 * (3 - 2*progress)
-    mult = cfg.α_start_mult + smooth_progress * (cfg.α_end_mult - cfg.α_start_mult)
-    return α_target * mult
+    β::Float64 = 1.0
+    γ::Float64 = begin
+        if n <= 10
+            5.0
+        elseif n <= 15
+            50.0 * (n / 10)  # Much stronger binary pressure
+        else
+            100.0 * (n / 10)
+        end
+    end
 end
-
-# ============================================================================
-# CLI Argument Parsing
-# ============================================================================
 
 function parse_cli_args(args)
     s = ArgParseSettings(
-        description = "N3L Solver v2 - No-Three-In-Line problem solver using SciML",
-        version = "2.0.0",
+        description = "N3L Diagnostic Solver",
+        version = "2.1.0",
         add_version = true
     )
     
@@ -101,26 +79,23 @@ function parse_cli_args(args)
         "--R"
             help = "Number of parallel trajectories"
             arg_type = Int
-            default = 500
+            default = 200
         "--T"
-            help = "Max integration time per trajectory"
+            help = "Max integration time"
             arg_type = Float64
-            default = 30.0
+            default = 20.0
         "--seed"
-            help = "Random seed for reproducibility"
+            help = "Random seed"
             arg_type = UInt64
         "--outdir"
-            help = "Output directory base path"
+            help = "Output directory"
             arg_type = String
             default = "solutions"
-        "--no-anneal"
-            help = "Disable annealing (use fixed α)"
-            action = :store_true
-        "--no-repair"
-            help = "Disable local repair phase"
-            action = :store_true
         "--quiet", "-q"
-            help = "Suppress most output"
+            help = "Suppress output"
+            action = :store_true
+        "--debug"
+            help = "Enable debug logging"
             action = :store_true
     end
     
@@ -128,72 +103,95 @@ function parse_cli_args(args)
 end
 
 # ============================================================================
-# Collinear Triples with Adjacency List
+# Sparse Structure (VERIFIED VERSION)
 # ============================================================================
 
-struct TripleData
-    triples::Vector{NTuple{3,Int}}
-    point_to_triples::Vector{Vector{Int}}
+struct SparseTripleData
+    point_to_pairs::Vector{Vector{Tuple{Int,Int}}}
+    n_triples::Int
 end
 
-function compute_triples(n::Int)
-    triples = NTuple{3,Int}[]
-    N = n * n
-    point_to_triples = [Int[] for _ in 1:N]
+function build_sparse_triples(n::Int; verbose=false)
+    N = n^2
+    point_to_pairs = [Tuple{Int,Int}[] for _ in 1:N]
     
-    triple_idx = 0
+    # Collect all unique triplets first
+    triplet_set = Set{Tuple{Int,Int,Int}}()
+    
     for x1 in 1:n, y1 in 1:n
         for x2 in 1:n, y2 in 1:n
             (x2, y2) <= (x1, y1) && continue
             for x3 in 1:n, y3 in 1:n
                 (x3, y3) <= (x2, y2) && continue
+                
                 if x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2) == 0
-                    i1 = (x1-1)*n + y1
-                    i2 = (x2-1)*n + y2
-                    i3 = (x3-1)*n + y3
-                    push!(triples, (i1, i2, i3))
-                    triple_idx += 1
-                    push!(point_to_triples[i1], triple_idx)
-                    push!(point_to_triples[i2], triple_idx)
-                    push!(point_to_triples[i3], triple_idx)
+                    i = (x1-1)*n + y1
+                    j = (x2-1)*n + y2
+                    k = (x3-1)*n + y3
+                    
+                    triple = tuple(sort([i, j, k])...)
+                    push!(triplet_set, triple)
                 end
             end
         end
     end
     
-    return TripleData(triples, point_to_triples)
+    # Now build the point_to_pairs structure
+    for (i, j, k) in triplet_set
+        push!(point_to_pairs[i], (j, k))
+        push!(point_to_pairs[j], (i, k))
+        push!(point_to_pairs[k], (i, j))
+    end
+    
+    if verbose
+        println("  Total unique triplets: $(length(triplet_set))")
+        pairs_per_point = [length(pairs) for pairs in point_to_pairs]
+        println("  Pairs/point - min: $(minimum(pairs_per_point)), max: $(maximum(pairs_per_point)), avg: $(mean(pairs_per_point))")
+    end
+    
+    return SparseTripleData(point_to_pairs, length(triplet_set))
 end
 
 # ============================================================================
-# Energy and Gradient
+# Energy and Gradient with VERIFICATION
 # ============================================================================
 
-function energy(x, td::TripleData, α, β, γ)
+function energy_sparse(x, triples::SparseTripleData, cfg::Config)
+    # Count each triplet exactly once
     E_col = 0.0
-    @inbounds for (i, j, k) in td.triples
-        E_col += x[i] * x[j] * x[k]
+    counted = Set{Tuple{Int,Int,Int}}()
+    
+    @inbounds for i in eachindex(triples.point_to_pairs)
+        xi = x[i]
+        for (j, k) in triples.point_to_pairs[i]
+            triple = tuple(sort([i, j, k])...)
+            if !(triple in counted)
+                E_col += xi * x[j] * x[k]
+                push!(counted, triple)
+            end
+        end
     end
     
-    E_count = -β * sum(x)
+    E_count = -cfg.β * sum(x)
+    E_bin = sum(x .^ 2 .* (1 .- x) .^ 2)
     
-    E_bin = 0.0
-    @inbounds for i in eachindex(x)
-        E_bin += x[i]^2 * (1 - x[i])^2
-    end
-    
-    return α * E_col + E_count + γ * E_bin
+    return cfg.α * E_col + E_count + cfg.γ * E_bin
 end
 
-function gradient!(g, x, td::TripleData, α, β, γ)
+function gradient_sparse!(g, x, triples::SparseTripleData, cfg::Config)
+    # Binary + count terms
     @inbounds for i in eachindex(x)
         xi = x[i]
-        g[i] = -β + γ * xi * (2 - 6*xi + 4*xi*xi)
+        g[i] = -cfg.β + cfg.γ * xi * (2 - 6*xi + 4*xi*xi)
     end
     
-    @inbounds for (i, j, k) in td.triples
-        g[i] += α * x[j] * x[k]
-        g[j] += α * x[i] * x[k]
-        g[k] += α * x[i] * x[j]
+    # Collinearity gradient
+    @inbounds for i in eachindex(triples.point_to_pairs)
+        contrib = 0.0
+        for (j, k) in triples.point_to_pairs[i]
+            contrib += x[j] * x[k]
+        end
+        g[i] += cfg.α * contrib
     end
     
     return g
@@ -205,173 +203,84 @@ end
 
 binarize(x, τ) = BitVector(x .>= τ)
 
-function count_violations(x_bin, td::TripleData)
+function count_violations_sparse(x_bin, triples::SparseTripleData)
     count = 0
-    @inbounds for (i, j, k) in td.triples
-        count += x_bin[i] & x_bin[j] & x_bin[k]
+    counted = Set{Tuple{Int,Int,Int}}()
+    
+    @inbounds for i in eachindex(triples.point_to_pairs)
+        x_bin[i] || continue
+        
+        for (j, k) in triples.point_to_pairs[i]
+            if x_bin[j] && x_bin[k]
+                triple = tuple(sort([i, j, k])...)
+                if !(triple in counted)
+                    count += 1
+                    push!(counted, triple)
+                end
+            end
+        end
     end
+    
     return count
 end
 
-function find_violation_points(x_bin, td::TripleData)
-    violation_points = Set{Int}()
-    @inbounds for (i, j, k) in td.triples
-        if x_bin[i] && x_bin[j] && x_bin[k]
-            push!(violation_points, i, j, k)
+# ============================================================================
+# IMPROVED Initial Condition
+# ============================================================================
+
+function biased_init(rng, N, target_density, n)
+    # More sophisticated initialization for larger n
+    if n <= 10
+        # Original approach
+        a = max(0.5, 2.0 * target_density)
+        b = max(0.5, 2.0 * (1.0 - target_density))
+        
+        x0 = Vector{Float64}(undef, N)
+        @inbounds for i in 1:N
+            u = rand(rng)^(1/a)
+            v = rand(rng)^(1/b)
+            x0[i] = u / (u + v)
+        end
+    else
+        # For n>10: Start with more structure
+        # Place points on a jittered grid pattern
+        x0 = zeros(Float64, N)
+        target_count = 2 * n
+        
+        # Select random positions with some spatial spreading
+        positions = shuffle(rng, 1:N)
+        for i in 1:target_count
+            x0[positions[i]] = 0.7 + 0.25 * rand(rng)  # Start high
+        end
+        
+        # Add noise to remaining positions
+        for i in (target_count+1):N
+            x0[positions[i]] = 0.1 * rand(rng)  # Start low
         end
     end
-    return violation_points
-end
-
-# ============================================================================
-# Local Repair (greedy search when close to solution)
-# ============================================================================
-
-function local_repair!(x_bin::BitVector, td::TripleData, n::Int, rng; max_iters::Int=2000)
-    target = 2n
-    N = n * n
     
-    for iter in 1:max_iters
-        pts = sum(x_bin)
-        viols = count_violations(x_bin, td)
-        
-        # Success?
-        if pts == target && viols == 0
-            return true, iter
-        end
-        
-        viol_pts = find_violation_points(x_bin, td)
-        
-        # Strategy 1: Remove worst violation point (if at or above target)
-        if !isempty(viol_pts) && pts >= target
-            worst_pt = 0
-            worst_count = 0
-            for pt in viol_pts
-                count = 0
-                for tidx in td.point_to_triples[pt]
-                    i, j, k = td.triples[tidx]
-                    if x_bin[i] && x_bin[j] && x_bin[k]
-                        count += 1
-                    end
-                end
-                if count > worst_count
-                    worst_count = count
-                    worst_pt = pt
-                end
-            end
-            
-            if worst_pt > 0
-                x_bin[worst_pt] = false
-                continue
-            end
-        end
-        
-        # Strategy 2: Add safe point if under target
-        if pts < target
-            best_pt = 0
-            best_viols = typemax(Int)
-            
-            # Shuffle to avoid bias
-            candidates = shuffle(rng, collect(1:N))
-            
-            for pt in candidates
-                x_bin[pt] && continue
-                
-                new_viols = 0
-                for tidx in td.point_to_triples[pt]
-                    i, j, k = td.triples[tidx]
-                    others = (i == pt ? 0 : x_bin[i]) + 
-                             (j == pt ? 0 : x_bin[j]) + 
-                             (k == pt ? 0 : x_bin[k])
-                    if others == 2
-                        new_viols += 1
-                    end
-                end
-                
-                if new_viols < best_viols
-                    best_viols = new_viols
-                    best_pt = pt
-                    new_viols == 0 && break  # Can't do better
-                end
-            end
-            
-            if best_pt > 0 && best_viols == 0
-                x_bin[best_pt] = true
-                continue
-            end
-        end
-        
-        # Strategy 3: Swap - remove violation point, add safe point
-        if !isempty(viol_pts)
-            viol_list = collect(viol_pts)
-            remove_pt = viol_list[rand(rng, 1:length(viol_list))]
-            x_bin[remove_pt] = false
-            
-            # Find safe point to add
-            candidates = shuffle(rng, collect(1:N))
-            for pt in candidates
-                x_bin[pt] && continue
-                
-                safe = true
-                for tidx in td.point_to_triples[pt]
-                    i, j, k = td.triples[tidx]
-                    others = (i == pt ? 0 : x_bin[i]) + 
-                             (j == pt ? 0 : x_bin[j]) + 
-                             (k == pt ? 0 : x_bin[k])
-                    if others == 2
-                        safe = false
-                        break
-                    end
-                end
-                
-                if safe
-                    x_bin[pt] = true
-                    break
-                end
-            end
-            continue
-        end
-        
-        # No progress
-        break
-    end
-    
-    pts = sum(x_bin)
-    viols = count_violations(x_bin, td)
-    return pts == target && viols == 0, max_iters
-end
-
-# ============================================================================
-# Initial Condition
-# ============================================================================
-
-function biased_init(rng, N, target_density)
-    a = max(0.5, 2.0 * target_density)
-    b = max(0.5, 2.0 * (1.0 - target_density))
-    
-    x0 = Vector{Float64}(undef, N)
-    @inbounds for i in 1:N
-        u = rand(rng)^(1/a)
-        v = rand(rng)^(1/b)
-        x0[i] = u / (u + v)
-    end
     return x0
 end
 
 # ============================================================================
-# ODE System
+# ODE System with DIAGNOSTICS
 # ============================================================================
 
-function make_rhs(td::TripleData, cfg::Config)
-    N = cfg.n^2
-    g = zeros(N)
+function make_rhs_sparse(triples::SparseTripleData, cfg::Config; debug=false)
+    g = zeros(cfg.n^2)
     
     function rhs!(dx, x, p, t)
-        α = get_α(cfg, t)
-        gradient!(g, x, td, α, cfg.β, cfg.γ)
+        gradient_sparse!(g, x, triples, cfg)
+        
+        if debug && t > 0 && mod(t, 1.0) < 0.01
+            E = energy_sparse(x, triples, cfg)
+            grad_norm = norm(g)
+            println("  [t=$(round(t,digits=2))] E=$(round(E,digits=2)), |∇E|=$(round(grad_norm,digits=2)), sum(x)=$(round(sum(x),digits=1))")
+        end
         
         @inbounds for i in eachindex(x)
             dx[i] = -g[i]
+            # Soft boundary
             if x[i] <= 0 && dx[i] < 0
                 dx[i] = 0.0
             elseif x[i] >= 1 && dx[i] > 0
@@ -384,26 +293,25 @@ function make_rhs(td::TripleData, cfg::Config)
 end
 
 # ============================================================================
-# Single Trajectory
+# Single Trajectory with BETTER DIAGNOSTICS
 # ============================================================================
 
-@enum Status RUNNING SUCCESS REPAIRED STUCK TIMEOUT
+@enum Status RUNNING SUCCESS STUCK TIMEOUT
 
-function run_trajectory(cfg::Config, td::TripleData, global_success::Ref{Bool}, 
-                        rng, traj_seed::UInt64; use_repair::Bool=true)
+function run_trajectory(cfg::Config, triples::SparseTripleData, 
+                       global_success::Ref{Bool}, rng, traj_seed::UInt64; debug=false)
     N = cfg.n^2
     target = 2 * cfg.n
     
-    x0 = biased_init(rng, N, target / N)
+    # Improved initialization
+    x0 = biased_init(rng, N, target / N, cfg.n)
     
     status = Ref(RUNNING)
-    best_viols = Ref(typemax(Int))
-    best_x = Ref{Union{Nothing, Vector{Float64}}}(nothing)
+    last_energy = Ref(Inf)
     stall_count = Ref(0)
-    last_viols = Ref(typemax(Int))
-    perturb_count = Ref(0)
+    min_violations = Ref(1000000)
     
-    rhs! = make_rhs(td, cfg)
+    rhs! = make_rhs_sparse(triples, cfg; debug=debug)
     
     function check!(integrator)
         global_success[] && (terminate!(integrator); return)
@@ -411,174 +319,221 @@ function run_trajectory(cfg::Config, td::TripleData, global_success::Ref{Bool},
         x = integrator.u
         t = integrator.t
         
+        # Evaluate
         x_bin = topk_mask(x, target)
-        viols = count_violations(x_bin, td)
+        viols = count_violations_sparse(x_bin, triples)
         
-        # Track best
-        if viols < best_viols[]
-            best_viols[] = viols
-            best_x[] = copy(x)
+        # Track best violations seen
+        if viols < min_violations[]
+            min_violations[] = viols
+            if debug
+                println("  [t=$(round(t,digits=2))] New best: $(viols) violations")
+            end
         end
         
-        # Direct success
+        # Success?
         if viols == 0
             status[] = SUCCESS
             terminate!(integrator)
             return
         end
         
-        # Track stalling
-        if viols >= last_viols[]
+        # Energy tracking
+        E = energy_sparse(x, triples, cfg)
+        if E > last_energy[] - 1e-8
             stall_count[] += 1
         else
             stall_count[] = 0
         end
-        last_viols[] = viols
+        last_energy[] = E
         
-        # Violation-targeted perturbation when stuck
-        if stall_count[] >= 8 && t > 0.2 * cfg.T && t < 0.85 * cfg.T && perturb_count[] < 5
-            viol_pts = find_violation_points(x_bin, td)
+        # More aggressive perturbation for larger n
+        perturb_threshold = cfg.n <= 10 ? 5 : 3  # Perturb sooner for large n
+        
+        if viols > 0 && stall_count[] >= perturb_threshold && t > 0.3 * cfg.T
+            # Stronger perturbation for larger n
+            perturb_scale = cfg.n <= 10 ? 0.25 : 0.4
+            u_modified = false
             
-            if !isempty(viol_pts)
-                # Push violation points toward 0
-                for pt in viol_pts
-                    integrator.u[pt] *= 0.3 + 0.4 * rand(rng)
-                end
-                
-                # Boost some random non-violation points
-                non_viol = [i for i in 1:N if !(i in viol_pts) && integrator.u[i] < 0.6]
-                for _ in 1:min(length(viol_pts), length(non_viol))
-                    if !isempty(non_viol)
-                        idx = rand(rng, 1:length(non_viol))
-                        pt = non_viol[idx]
-                        integrator.u[pt] = 0.6 + 0.3 * rand(rng)
-                        deleteat!(non_viol, idx)
-                    end
+            @inbounds for i in eachindex(integrator.u)
+                if integrator.u[i] > 0.05 && integrator.u[i] < 0.95
+                    integrator.u[i] += perturb_scale * (2.0 * rand(rng) - 1.0)
+                    integrator.u[i] = clamp(integrator.u[i], 0.0, 1.0)
+                    u_modified = true
                 end
             end
             
-            stall_count[] = 0
-            perturb_count[] += 1
-        end
-        
-        # Truly stuck - too many perturbations without progress
-        if perturb_count[] >= 5 && stall_count[] >= 10
-            status[] = STUCK
-            terminate!(integrator)
-            return
+            if u_modified
+                stall_count[] = 0
+                last_energy[] = Inf
+                if debug
+                    println("  [t=$(round(t,digits=2))] Perturbed! Continuing search...")
+                end
+                return
+            else
+                status[] = STUCK
+                terminate!(integrator)
+                return
+            end
         end
     end
     
     cb = PeriodicCallback(check!, cfg.check_interval; save_positions=(false, false))
     
+    # Solve
     prob = ODEProblem(rhs!, x0, (0.0, cfg.T))
     sol = solve(prob, Tsit5(); abstol=1e-6, reltol=1e-4, callback=cb,
                 save_everystep=false, save_start=false, maxiters=1_000_000)
     
-    # Use best solution
-    x_final = best_x[] !== nothing ? best_x[] : sol.u[end]
+    # Final check
+    x_final = sol.u[end]
     x_bin = topk_mask(x_final, target)
-    viols = count_violations(x_bin, td)
+    viols = count_violations_sparse(x_bin, triples)
+    pts = target
     
-    # Try local repair if close
-    if status[] == RUNNING && viols > 0 && viols <= 15 && use_repair
-        repair_rng = Xoshiro(splitmix64(traj_seed ⊻ UInt64(viols)))
-        repaired, _ = local_repair!(x_bin, td, cfg.n, repair_rng; max_iters=3000)
-        if repaired
-            status[] = REPAIRED
-            viols = 0
-        end
-    end
-    
-    # Final status
     if status[] == RUNNING
         status[] = (viols == 0) ? SUCCESS : TIMEOUT
     end
     
-    return status[], x_bin, target, viols
+    if debug
+        println("  Final: $(viols) violations (best seen: $(min_violations[]))")
+    end
+    
+    return status[], x_bin, pts, viols, min_violations[]
 end
 
 # ============================================================================
-# Parallel Search
+# Parallel Search with STATISTICS
 # ============================================================================
 
-function solve_n3l(n::Int, R::Int, T::Float64, seed::UInt64, outdir::String;
-                   verbose::Bool=true, use_anneal::Bool=true, use_repair::Bool=true)
-    cfg = Config(n=n, R=R, T=T, anneal=use_anneal)
+function solve_n3l(n::Int, R::Int, T::Float64, seed::UInt64, outdir::String; 
+                  verbose::Bool=true, debug::Bool=false)
+    cfg = Config(n=n, R=R, T=T)
     target = 2n
     
-    verbose && println("="^60)
-    verbose && @printf("N3L Solver v2: n=%d, target=%d points\n", n, target)
+    verbose && println("="^70)
+    verbose && @printf("N3L DIAGNOSTIC Solver: n=%d, target=%d points\n", n, target)
     verbose && @printf("R=%d trajectories, T=%.1fs, threads=%d\n", R, T, Threads.nthreads())
+    verbose && @printf("Hyperparameters: α=%.1f, β=%.1f, γ=%.1f\n", cfg.α, cfg.β, cfg.γ)
     verbose && @printf("seed=%d\n", seed)
-    verbose && @printf("anneal=%s, repair=%s\n", use_anneal, use_repair)
+    verbose && println("-"^70)
     
-    td = compute_triples(n)
-    verbose && @printf("Collinear triples: %d\n", length(td.triples))
-    if use_anneal
-        verbose && @printf("α: %.2f → %.2f (annealed)\n", get_α(cfg, 0.0), get_α(cfg, cfg.T))
-    else
-        verbose && @printf("α: %.2f (fixed)\n", get_α(cfg, cfg.T/2))
-    end
-    verbose && @printf("γ: %.2f\n", cfg.γ)
-    verbose && println("-"^60)
+    # Build sparse structure
+    verbose && print("Building sparse structure... ")
+    build_time = @elapsed triples = build_sparse_triples(n; verbose=verbose)
+    verbose && @printf("done (%.3fs)\n", build_time)
     
+    # Shared state
     global_success = Ref(false)
     result_grid = Ref{Union{Nothing, BitVector}}(nothing)
-    result_status = Ref(TIMEOUT)
     result_lock = ReentrantLock()
-    stats = Dict(:success=>0, :repaired=>0, :stuck=>0, :timeout=>0)
-    best_viols_seen = Ref(typemax(Int))
+    stats = Dict(:success=>0, :stuck=>0, :timeout=>0)
+    violation_history = Int[]
     
     start_time = time()
     
-    Threads.@threads for id in 1:R
+    # Run first trajectory with debug if requested
+    if debug && R > 0
+        println("\n" * "="^70)
+        println("DEBUG: Running first trajectory with detailed logging")
+        println("="^70)
+        rng = Xoshiro(splitmix64(seed ⊻ UInt64(n) ⊻ UInt64(1)))
+        status, x_bin, pts, viols, min_viols = run_trajectory(cfg, triples, global_success, rng, splitmix64(seed); debug=true)
+        println("="^70)
+        println("First trajectory: status=$status, violations=$viols")
+        println("="^70 * "\n")
+        
+        if status == SUCCESS
+            global_success[] = true
+            result_grid[] = x_bin
+        end
+        
+        R = R - 1  # One less to run
+    end
+    
+    # Parallel search
+    violation_lock = ReentrantLock()
+    
+    Threads.@threads for id in 1:(R)
         global_success[] && continue
         
-        traj_seed = splitmix64(seed ⊻ UInt64(n) ⊻ (UInt64(id) << 1))
+        traj_seed = splitmix64(seed ⊻ UInt64(n) ⊻ (UInt64(id + (debug ? 1 : 0)) << 1))
         rng = Xoshiro(traj_seed)
-        status, x_bin, pts, viols = run_trajectory(cfg, td, global_success, rng, traj_seed;
-                                                    use_repair=use_repair)
+        status, x_bin, pts, viols, min_viols = run_trajectory(cfg, triples, global_success, rng, traj_seed; debug=false)
         
         lock(result_lock) do
-            if viols < best_viols_seen[]
-                best_viols_seen[] = viols
-            end
-            
-            if (status == SUCCESS || status == REPAIRED) && !global_success[]
+            if status == SUCCESS && !global_success[]
                 global_success[] = true
                 result_grid[] = x_bin
-                result_status[] = status
-                verbose && @printf("  ✓ Worker %d: %s (%.2fs)\n", id, status, time()-start_time)
+                verbose && @printf("  ✓ Worker %d found solution (%.2fs)\n", id, time()-start_time)
             end
             
-            key = status == SUCCESS ? :success :
-                  status == REPAIRED ? :repaired :
+            key = status == SUCCESS ? :success : 
                   status == STUCK ? :stuck : :timeout
             stats[key] += 1
-            
-            total = sum(values(stats))
-            if verbose && total % max(1, R ÷ 10) == 0 && !global_success[]
-                @printf("  [%d/%d] best_viols=%d\n", total, R, best_viols_seen[])
-            end
+        end
+        
+        lock(violation_lock) do
+            push!(violation_history, min_viols)
         end
     end
     
     elapsed = time() - start_time
     
-    verbose && println("-"^60)
+    # Detailed statistics
+    verbose && println("-"^70)
+    verbose && println("STATISTICS:")
+    verbose && @printf("  Success: %d/%d (%.1f%%)\n", stats[:success], R, 100*stats[:success]/R)
+    verbose && @printf("  Stuck: %d, Timeout: %d\n", stats[:stuck], stats[:timeout])
+    
+    if !isempty(violation_history)
+        sorted_viols = sort(violation_history)
+        verbose && println("  Best violations achieved:")
+        verbose && @printf("    Min: %d\n", minimum(sorted_viols))
+        verbose && @printf("    25th percentile: %d\n", sorted_viols[max(1, div(length(sorted_viols), 4))])
+        verbose && @printf("    Median: %d\n", sorted_viols[max(1, div(length(sorted_viols), 2))])
+        verbose && @printf("    75th percentile: %d\n", sorted_viols[max(1, 3*div(length(sorted_viols), 4))])
+        verbose && @printf("    Max: %d\n", maximum(sorted_viols))
+        
+        # Critical metric: how close are we getting?
+        close_calls = count(v -> v <= 5, sorted_viols)
+        very_close = count(v -> v <= 2, sorted_viols)
+        verbose && @printf("  Close calls (≤5 violations): %d (%.1f%%)\n", close_calls, 100*close_calls/length(sorted_viols))
+        verbose && @printf("  Very close (≤2 violations): %d (%.1f%%)\n", very_close, 100*very_close/length(sorted_viols))
+    end
+    
+    verbose && println("-"^70)
+    
     if global_success[]
         grid = reshape(result_grid[], (n, n))
-        verbose && @printf("SUCCESS via %s!\n", result_status[])
+        verbose && println("✓✓✓ SUCCESS! ✓✓✓")
         verbose && @printf("Time: %.3fs\n", elapsed)
         verbose && println("Grid:")
         print_grid(grid)
         save_solution(n, grid, R, T, seed, outdir)
         return true, grid, elapsed, stats, seed
     else
-        verbose && @printf("FAILED (best_viols=%d)\n", best_viols_seen[])
-        verbose && @printf("Stats: %s\n", stats)
+        verbose && println("✗✗✗ FAILED ✗✗✗")
         verbose && @printf("Time: %.3fs\n", elapsed)
+        verbose && println("\nRECOMMENDATIONS:")
+        
+        if !isempty(violation_history)
+            min_viol = minimum(violation_history)
+            if min_viol <= 10
+                verbose && println("  → Getting close! Try:")
+                verbose && println("     • Increase R to $(2*R) or $(5*R)")
+                verbose && println("     • Increase T to $(2*T)")
+                verbose && println("     • Increase α to $(2*cfg.α)")
+            elseif min_viol <= 50
+                verbose && println("  → Making progress but stuck. Try:")
+                verbose && println("     • Much higher R ($(5*R)+)")
+                verbose && println("     • Stronger penalties: α=$(3*cfg.α), γ=$(3*cfg.γ)")
+            else
+                verbose && println("  → Not converging. This size may need UDE (Phase 2)")
+                verbose && println("     • Current approach likely insufficient for n=$(n)")
+            end
+        end
+        
         return false, nothing, elapsed, stats, seed
     end
 end
@@ -638,9 +593,8 @@ function main()
     T = args["T"]
     outdir = args["outdir"]
     quiet = args["quiet"]
+    debug = args["debug"]
     verbose = !quiet
-    use_anneal = !args["no-anneal"]
-    use_repair = !args["no-repair"]
     
     seed = if isnothing(args["seed"])
         rand(RandomDevice(), UInt64)
@@ -648,14 +602,11 @@ function main()
         args["seed"]
     end
     
-    success, grid, elapsed, stats, used_seed = solve_n3l(n, R, T, seed, outdir;
-                                                          verbose=verbose,
-                                                          use_anneal=use_anneal,
-                                                          use_repair=use_repair)
+    success, grid, elapsed, stats, used_seed = solve_n3l(n, R, T, seed, outdir; verbose=verbose, debug=debug)
     
     if success
         println()
-        println("Reproduce: julia --threads=$(Threads.nthreads()) main.jl $(n) --R $(R) --T $(T) --seed $(used_seed)")
+        println("Reproduce: julia --threads=12 main_sparse.jl $(n) --R $(R) --T $(T) --seed $(used_seed)")
     end
     
     return success ? 0 : 1
