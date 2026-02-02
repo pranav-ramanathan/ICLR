@@ -1,20 +1,3 @@
-#!/usr/bin/env julia
-#=
-N3L SciML Solver (Single File)
-==============================
-Scientific Machine Learning approach to No-Three-In-Line problem.
-Gradient flow dynamics with parallel search and early termination.
-
-Usage:
-    julia --threads=12 main.jl 10              # Single grid size
-    julia --threads=12 main.jl 10 --R 200      # Custom trajectories
-    julia --threads=12 main.jl 10 --seed 42    # Reproducible run
-    julia --threads=12 main.jl --help          # Show help
-
-Author: Sandy
-Style: Chris Rackauckas / SciML conventions
-=#
-
 using OrdinaryDiffEq
 using DiffEqCallbacks
 using Random
