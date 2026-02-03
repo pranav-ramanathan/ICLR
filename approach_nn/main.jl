@@ -1,55 +1,35 @@
 #!/usr/bin/env julia
 #=
-N3L UDE Training - Selection Policy Approach
-============================================
-NN learns which 2n points to select, physics refines the selection.
-Based on Lotka-Volterra and SIRHD UDE examples.
+N3L UDE Training - Global Energy Correction
+===========================================
+NN learns a global energy correction based on system-wide features.
+Much faster: 1 NN call per timestep instead of N^2 calls.
 =#
 
 using Lux, OrdinaryDiffEq, Optimization, OptimizationOptimisers
 using OptimizationOptimJL, ComponentArrays, SciMLSensitivity
-using Random, Statistics, LinearAlgebra, Plots, Printf, Dates
+using Random, Statistics, LinearAlgebra, Printf
 
 # ============================================================================
-# Base N3L Functions
+# Core N3L Functions
 # ============================================================================
-
-@inline function splitmix64(x::UInt64)
-    x += 0x9e3779b97f4a7c15
-    z = x
-    z = (z ⊻ (z >> 30)) * 0xbf58476d1ce4e5b9
-    z = (z ⊻ (z >> 27)) * 0x94d049bb133111eb
-    return z ⊻ (z >> 31)
-end
 
 function topk_mask(x::AbstractVector{<:Real}, k::Int)
     idx = partialsortperm(x, 1:k; rev=true)
-    m = falses(length(x))
-    @inbounds for i in idx
-        m[i] = true
-    end
-    return BitVector(m)
+    return [i in idx for i in 1:length(x)]
 end
 
 function compute_triples(n::Int)
     triples = NTuple{3,Int}[]
-    
-    for x1 in 1:n, y1 in 1:n
-        for x2 in 1:n, y2 in 1:n
-            (x2, y2) <= (x1, y1) && continue
-            for x3 in 1:n, y3 in 1:n
-                (x3, y3) <= (x2, y2) && continue
-                if x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2) == 0
-                    push!(triples, (
-                        (x1-1)*n + y1,
-                        (x2-1)*n + y2,
-                        (x3-1)*n + y3
-                    ))
-                end
+    for x1 in 1:n, y1 in 1:n, x2 in 1:n, y2 in 1:n
+        (x2, y2) <= (x1, y1) && continue
+        for x3 in 1:n, y3 in 1:n
+            (x3, y3) <= (x2, y2) && continue
+            if x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2) == 0
+                push!(triples, ((x1-1)*n + y1, (x2-1)*n + y2, (x3-1)*n + y3))
             end
         end
     end
-    
     return triples
 end
 
@@ -64,7 +44,6 @@ end
 function biased_init(rng, N, target_density)
     a = max(0.5, 2.0 * target_density)
     b = max(0.5, 2.0 * (1.0 - target_density))
-    
     x0 = Vector{Float64}(undef, N)
     @inbounds for i in 1:N
         u = rand(rng)^(1/a)
@@ -83,165 +62,116 @@ Base.@kwdef struct Config
 end
 
 function energy(x, triples, cfg::Config)
-    E_col = 0.0
-    @inbounds for (i, j, k) in triples
-        E_col += x[i] * x[j] * x[k]
-    end
-    
+    E_col = sum(x[i] * x[j] * x[k] for (i, j, k) in triples)
     E_count = -cfg.β * sum(x)
-    
-    E_bin = 0.0
-    @inbounds for i in eachindex(x)
-        E_bin += x[i]^2 * (1 - x[i])^2
-    end
-    
+    E_bin = sum(x .^ 2 .* (1 .- x) .^ 2)
     return cfg.α * E_col + E_count + cfg.γ * E_bin
 end
 
-function gradient!(g, x, triples, cfg::Config)
+function gradient_nonmutating(x, triples, cfg::Config)
+    g = similar(x)
     @inbounds for i in eachindex(x)
         xi = x[i]
         g[i] = -cfg.β + cfg.γ * xi * (2 - 6*xi + 4*xi*xi)
     end
-    
     @inbounds for (i, j, k) in triples
-        g[i] += cfg.α * x[j] * x[k]
-        g[j] += cfg.α * x[i] * x[k]
-        g[k] += cfg.α * x[i] * x[j]
+        g[i] = g[i] + cfg.α * x[j] * x[k]
+        g[j] = g[j] + cfg.α * x[i] * x[k]
+        g[k] = g[k] + cfg.α * x[i] * x[j]
     end
-    
     return g
 end
 
 # ============================================================================
-# Problem Setup
+# Setup
 # ============================================================================
 
-# Set random seed for reproducibility
 rng = Xoshiro(1111)
-
-# Problem parameters
 const n_problem = 14
 const N_problem = n_problem^2
 const target_points = 2 * n_problem
-
-# Configuration
 const cfg = Config(n=n_problem, α=300.0, β=1.0, γ=20.0, T=60.0)
-
-# Precompute collinear triples
 const triples = compute_triples(n_problem)
 println("Collinear triples: $(length(triples))")
 
-# Generate initial conditions for training
 const u0_samples = [biased_init(Xoshiro(1000 + i), N_problem, target_points/N_problem) 
                     for i in 1:20]
-
-# Time span
 const tspan = (0.0, cfg.T)
-const t_eval = [cfg.T]  # Only evaluate at final time
+const t_eval = [cfg.T]
 
 # ============================================================================
-# Feature Extraction
+# Global Features Only - AD Compatible
 # ============================================================================
 
-function extract_features(x, triples, cfg::Config)
+function extract_global_features(x, cfg::Config)
     N = length(x)
-    target = 2 * cfg.n
-    x_bin = topk_mask(x, target)
-    viols = count_violations(x_bin, triples)
     
-    # Count near-violations (2 of 3 active)
-    near_viols = 0
-    for (i, j, k) in triples
-        active = Int(x_bin[i]) + Int(x_bin[j]) + Int(x_bin[k])
-        near_viols += (active == 2)
-    end
+    # Basic statistics
+    x_mean = sum(x) / N
+    x_var = sum((xi - x_mean)^2 for xi in x) / N
+    x_std = sqrt(x_var + 1e-8)
     
-    features = Float32[
-        sum(x) / N,
-        Float32(viols) / length(triples),
-        Float32(near_viols) / length(triples),
-        maximum(x),
-        minimum(x),
-        std(x),
-        sum(x .> 0.5) / N,
-        sum(x .> 0.8) / N,
-        sum(x .< 0.2) / N,
-        sum(x .* (1 .- x)),
-        sum(abs.(x .- 0.5)),
-        sum(x[1:div(N,2)]) / max(sum(x), 1e-10),
-        sum(x[1:2:end]) / max(sum(x), 1e-10),
-        Float32(energy(x, triples, cfg)) / N,
+    # Binary-related
+    binary_count = sum(x .> 0.5)
+    binary_density = binary_count / N
+    
+    # Fuzziness (distance from binary)
+    fuzziness = sum(xi * (1 - xi) for xi in x) / N
+    
+    # Moments
+    x_mean2 = sum(x .^ 2) / N
+    x_mean3 = sum(x .^ 3) / N
+    
+    # Distribution shape
+    x_min = minimum(x)
+    x_max = maximum(x)
+    x_range = x_max - x_min
+    
+    return [
+        x_mean,           # 1
+        x_std,            # 2
+        binary_density,   # 3
+        fuzziness,        # 4
+        x_mean2,          # 5
+        x_mean3,          # 6
+        x_min,            # 7
+        x_max,            # 8
+        x_range,          # 9
     ]
-    
-    return features
 end
 
 # ============================================================================
-# Neural Network Definition
+# Neural Network - Single Global Correction
 # ============================================================================
 
-# Initialize with smaller weights to prevent explosion
-function init_weights(rng, dims...)
-    return randn(rng, Float32, dims...) .* 0.01f0
-end
-
-# NN outputs selection logits for each grid position
 const U = Lux.Chain(
-    Lux.Dense(14, 128, tanh; init_weight=init_weights),
-    Lux.Dense(128, 128, tanh; init_weight=init_weights),
-    Lux.Dense(128, 128, tanh; init_weight=init_weights),
-    Lux.Dense(128, N_problem; init_weight=init_weights)
+    Lux.Dense(9, 32, tanh),
+    Lux.Dense(32, 32, tanh),
+    Lux.Dense(32, 1)  # Single scalar output
 )
 
-# Get the initial parameters and state variables
 p, st = Lux.setup(rng, U)
 const _st = st
 
 # ============================================================================
-# UDE Dynamics: Hybrid Selection + Physics
+# UDE Dynamics
 # ============================================================================
 
-function ude_dynamics!(du, u, p_nn, t, cfg_known, triples_known, g_physics)
+function ude_dynamics!(du, u, p_nn, t, cfg_known, triples_known)
     N = length(u)
-    target = 2 * cfg_known.n
     
-    # 1. Extract features
-    features = extract_features(u, triples_known, cfg_known)
+    # 1. Physics gradient
+    g_physics = gradient_nonmutating(u, triples_known, cfg_known)
     
-    # 2. NN outputs selection scores
-    selection_scores = U(features, p_nn, _st)[1]
+    # 2. Extract global features
+    features = extract_global_features(u, cfg_known)
     
-    # Normalize to [0, 1]
-    selection_scores = (selection_scores .- minimum(selection_scores)) ./ 
-                      (maximum(selection_scores) - minimum(selection_scores) .+ 1e-8)
+    # 3. NN predicts single energy correction scalar
+    correction_scalar = U(features, p_nn, _st)[1][1]
     
-    # 3. Physics gradient
-    gradient!(g_physics, u, triples_known, cfg_known)
-    
-    # 4. Time-dependent mixing
-    t_norm = t / cfg_known.T
-    
-    # Phase 1 (0-50%): NN selection dominates
-    # Phase 2 (50-100%): Physics refinement dominates
-    if t_norm < 0.5
-        α_nn = 0.8
-        α_physics = 0.2
-    else
-        α_nn = 0.2
-        α_physics = 0.8
-    end
-    
-    # 5. Combined dynamics
-    @inbounds for i in eachindex(u)
-        # NN selection force
-        target_value = selection_scores[i]
-        nn_force = α_nn * (target_value - u[i])
-        
-        # Physics gradient force
-        physics_force = -α_physics * g_physics[i]
-        
-        du[i] = nn_force + physics_force
+    # 4. Apply correction (scale to reasonable magnitude)
+    @inbounds for i in 1:N
+        du[i] = -g_physics[i] * (1.0 + 0.01 * correction_scalar)
         
         # Box constraints
         if u[i] <= 0 && du[i] < 0
@@ -252,61 +182,47 @@ function ude_dynamics!(du, u, p_nn, t, cfg_known, triples_known, g_physics)
     end
 end
 
-# Closure with known parameters
-nn_dynamics!(du, u, p_nn, t) = ude_dynamics!(du, u, p_nn, t, cfg, triples, zeros(N_problem))
-
-# Define the ODE problem
+nn_dynamics!(du, u, p_nn, t) = ude_dynamics!(du, u, p_nn, t, cfg, triples)
 prob_nn = ODEProblem(nn_dynamics!, u0_samples[1], tspan, p)
 
 # ============================================================================
-# Prediction Function
+# Prediction & Loss
 # ============================================================================
 
 function predict_adjoint(θ, initial_condition = u0_samples[1])
-    _prob = remake(prob_nn, u0 = initial_condition, tspan = tspan, p = θ)
+    _prob = remake(prob_nn, u0 = initial_condition, p = θ)
     x = Array(solve(_prob, Tsit5(), saveat = t_eval,
                     abstol = 1e-6, reltol = 1e-4,
                     sensealg = InterpolatingAdjoint(autojacvec = ReverseDiffVJP(true))))
     return x
 end
 
-# ============================================================================
-# Loss Function
-# ============================================================================
-
 function loss_adjoint(θ, n_samples = 5)
     total_loss = 0.0
     
     for i in 1:n_samples
-        # Use different initial conditions
-        initial_condition = u0_samples[min(i, length(u0_samples))]
-        
-        # Predict final state
-        x_final_mat = predict_adjoint(θ, initial_condition)
+        ic = u0_samples[min(i, length(u0_samples))]
+        x_final_mat = predict_adjoint(θ, ic)
         x_final = x_final_mat[:, end]
         
-        # Evaluate violations
         x_bin = topk_mask(x_final, target_points)
         viols = count_violations(x_bin, triples)
         
-        # Energy at final state
         E_final = energy(x_final, triples, cfg)
         
-        # Loss components
-        violation_loss = Float32(viols)
+        # Heavy violation penalty
+        violation_loss = Float32(viols)^2
         energy_loss = Float32(max(0, E_final))
         
-        total_loss += violation_loss + 0.01 * energy_loss
+        total_loss += violation_loss + 0.001 * energy_loss
     end
     
-    # Regularization
-    reg_loss = 0.0001 * sum(abs2, θ)
-    
+    reg_loss = 0.00001 * sum(abs2, θ)
     return total_loss / n_samples + reg_loss
 end
 
 # ============================================================================
-# Testing Function
+# Testing
 # ============================================================================
 
 function test_model(θ, n_tests = 10)
@@ -315,9 +231,7 @@ function test_model(θ, n_tests = 10)
     violation_counts = Int[]
     
     for i in 1:n_tests
-        rng_test = Xoshiro(5000 + i)
-        x0 = biased_init(rng_test, N_problem, target_points/N_problem)
-        
+        x0 = biased_init(Xoshiro(5000 + i), N_problem, target_points/N_problem)
         x_final_mat = predict_adjoint(θ, x0)
         x_final = x_final_mat[:, end]
         x_bin = topk_mask(x_final, target_points)
@@ -328,25 +242,6 @@ function test_model(θ, n_tests = 10)
         
         if viols == 0
             success_count += 1
-            @printf("  ✓ Found solution in test %d!\n", i)
-            
-            # Save solution
-            grid = reshape(x_bin, (cfg.n, cfg.n))
-            timestamp = Dates.format(now(), "yyyymmdd_HHMMSS")
-            outdir = "ude_solutions/$(cfg.n)"
-            mkpath(outdir)
-            filename = "$(outdir)/ude_sol_$(timestamp)_test$(i).txt"
-            
-            open(filename, "w") do io
-                println(io, "# UDE Solution")
-                println(io, "# n=$(cfg.n), target=$(target_points)")
-                println(io, "# α=$(cfg.α), β=$(cfg.β), γ=$(cfg.γ)")
-                println(io, "#")
-                println(io, "# Grid (0/1):")
-                for row in 1:cfg.n
-                    println(io, join(Int.(grid[row, :]), " "))
-                end
-            end
         end
     end
     
@@ -358,7 +253,7 @@ function test_model(θ, n_tests = 10)
 end
 
 # ============================================================================
-# Callback
+# Training
 # ============================================================================
 
 iter = 0
@@ -372,9 +267,8 @@ function callback(state, l)
         println("Iteration $iter: Loss = $l")
     end
     
-    # Test every 25 iterations
     if iter % 25 == 0
-        println("\n--- Testing current model ---")
+        println("\n--- Testing ---")
         min_viols, successes = test_model(state.u, 10)
         
         if min_viols < best_violations
@@ -387,115 +281,35 @@ function callback(state, l)
     return false
 end
 
-# ============================================================================
-# Training
-# ============================================================================
-
 println("="^60)
-println("N3L UDE Training - Hybrid Selection Policy")
+println("N3L UDE Training - Global Energy Correction")
 @printf("n=%d, target=%d points\n", n_problem, target_points)
-@printf("Hyperparameters: α=%.1f, β=%.1f, γ=%.1f\n", cfg.α, cfg.β, cfg.γ)
 println("="^60)
 
-# Convert to ComponentArray
 α = ComponentArray{Float32}(p)
 
-# Optimization setup
 adtype = Optimization.AutoZygote()
 optf = Optimization.OptimizationFunction((x, p) -> loss_adjoint(x, 5), adtype)
 optprob = Optimization.OptimizationProblem(optf, α)
 
-# Stage 1: ADAM with higher learning rate
-println("\n=== Stage 1: ADAM (lr=0.01) ===")
+println("\n=== Stage 1: ADAM (lr=0.001) ===")
 iter = 0
 @time res1 = Optimization.solve(
     optprob,
-    OptimizationOptimisers.Adam(0.01),
-    callback = callback,
-    maxiters = 200
-)
-
-println("\nLoss after Stage 1: ", loss_adjoint(res1.u, 20))
-
-# Stage 2: ADAM with lower learning rate
-println("\n=== Stage 2: ADAM (lr=0.001) ===")
-iter = 0
-optprob2 = Optimization.OptimizationProblem(optf, res1.u)
-@time res2 = Optimization.solve(
-    optprob2,
     OptimizationOptimisers.Adam(0.001),
     callback = callback,
+    maxiters = 300
+)
+
+println("\n=== Stage 2: ADAM (lr=0.0001) ===")
+iter = 0
+optprob2 = remake(optprob, u0 = res1.u)
+@time res2 = Optimization.solve(
+    optprob2,
+    OptimizationOptimisers.Adam(0.0001),
+    callback = callback,
     maxiters = 200
 )
 
-println("\nLoss after Stage 2: ", loss_adjoint(res2.u, 20))
-
-# Stage 3: L-BFGS for fine-tuning
-println("\n=== Stage 3: L-BFGS ===")
-iter = 0
-optprob3 = Optimization.OptimizationProblem(optf, res2.u)
-@time res3 = Optimization.solve(
-    optprob3,
-    LBFGS(linesearch = BackTracking()),
-    callback = callback,
-    maxiters = 100
-)
-
-println("\nFinal loss after L-BFGS: ", loss_adjoint(res3.u, 20))
-
-# Store the best parameters
-p_trained = res3.u
-
-# ============================================================================
-# Final Testing
-# ============================================================================
-
-println("\n" * "="^60)
-println("FINAL TEST (50 trajectories)")
-println("="^60)
-min_viols, successes = test_model(p_trained, 50)
-
-println("\n" * "="^60)
-println("Training Complete!")
-@printf("Best violations achieved: %d\n", best_violations)
-@printf("Final test: Min=%d, Success=%d/50\n", min_viols, successes)
-println("="^60)
-
-# ============================================================================
-# Analysis and Visualization
-# ============================================================================
-
-# Test prediction on a few samples
-println("\n=== Sample Predictions ===")
-for i in 1:3
-    test_x0 = u0_samples[i]
-    x_final_mat = predict_adjoint(p_trained, test_x0)
-    x_final = x_final_mat[:, end]
-    x_bin = topk_mask(x_final, target_points)
-    viols = count_violations(x_bin, triples)
-    
-    @printf("Sample %d: Final violations = %d\n", i, viols)
-    
-    if viols == 0
-        println("  ✓ Valid solution!")
-        grid = reshape(x_bin, (cfg.n, cfg.n))
-        for row in 1:cfg.n
-            print("  ")
-            for col in 1:cfg.n
-                print(grid[row, col] ? "● " : "· ")
-            end
-            println()
-        end
-    end
-end
-
-# Diagnostic: Check NN output behavior
-println("\n=== NN Output Diagnostics ===")
-test_x = u0_samples[1]
-test_features = extract_features(test_x, triples, cfg)
-test_selection = U(test_features, p_trained, _st)[1]
-println("Selection scores - Min: $(minimum(test_selection)), Max: $(maximum(test_selection)), Mean: $(mean(test_selection))")
-println("Number of high-confidence selections (>0.7): $(count(test_selection .> 0.7))")
-println("Number of low-confidence selections (<0.3): $(count(test_selection .< 0.3))")
-
-println("\n✓ Training complete!")
+println("\n=== Final Test (50 trajectories) ===")
+test_model(res2.u, 50)
