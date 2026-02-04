@@ -1,8 +1,8 @@
 #!/usr/bin/env julia
 #=
-N3L Pure Gradient Flow - SOLUTION FINDING MODE
-===============================================
-Stops immediately on first solution with detailed progress logging.
+N3L Pure Gradient Flow - SOLUTION FINDING MODE (OPTIMIZED)
+===========================================================
+Stops immediately on first solution with lock-free parallel execution.
 =#
 
 using OrdinaryDiffEq
@@ -11,6 +11,7 @@ using Random
 using Printf
 using Dates
 using ArgParse
+using Base.Threads: Atomic, atomic_add!, atomic_cas!
 
 # ============================================================================
 # Deterministic RNG Helpers
@@ -57,7 +58,7 @@ end
 
 function parse_cli_args(args)
     s = ArgParseSettings(
-        description = "N3L Pure Gradient Flow - Solution Finding",
+        description = "N3L Pure Gradient Flow - Solution Finding (Optimized)",
         version = "1.0.0",
         add_version = true
     )
@@ -76,10 +77,10 @@ function parse_cli_args(args)
             arg_type = Float64
             default = 15.0
         "--alpha"
-            help = "Override alpha penalty coefficient (default: 10*(n/6) for n≤10, 40 for n>10)"
+            help = "Override alpha penalty coefficient"
             arg_type = Float64
         "--gamma"
-            help = "Override gamma binary regularization (default: 5 for n≤10, 15 for n>10)"
+            help = "Override gamma binary regularization"
             arg_type = Float64
         "--seed"
             help = "Random seed"
@@ -259,7 +260,7 @@ function run_trajectory(cfg::Config, triples, rng)
 end
 
 # ============================================================================
-# Parallel Search - STOPS ON FIRST SOLUTION
+# Parallel Search - LOCK-FREE OPTIMIZED
 # ============================================================================
 
 function solve_n3l(n::Int, R::Int, T::Float64, seed::UInt64, outdir::String; 
@@ -281,32 +282,30 @@ function solve_n3l(n::Int, R::Int, T::Float64, seed::UInt64, outdir::String;
     target = 2n
     
     verbose && println("="^60)
-    verbose && @printf("n=%d, target=%d points\n", n, target)
-    verbose && @printf("Max trajectories: %d, T=%.1fs, threads=%d\n", R, T, Threads.nthreads())
-    verbose && @printf("Hyperparameters: α=%.1f, β=%.1f, γ=%.1f\n", cfg.α, cfg.β, cfg.γ)
-    verbose && @printf("Seed: %d\n", seed)
-    verbose && @printf("Progress updates every %d trajectories\n", progress_interval)
+    verbose && @printf("n=%d, target=%d | α=%.1f, β=%.1f, γ=%.1f\n", n, target, cfg.α, cfg.β, cfg.γ)
+    verbose && @printf("Max: %d traj, T=%.1fs, %d threads\n", R, T, Threads.nthreads())
+    verbose && @printf("Seed: %d | Progress: every %d\n", seed, progress_interval)
     verbose && println("="^60)
     
     triples = compute_triples(n)
-    verbose && @printf("Collinear triples: %d\n", length(triples))
+    verbose && @printf("Triples: %d\n", length(triples))
     verbose && println("-"^60)
     
-    # Atomic flags for early termination
-    solution_found = Threads.Atomic{Bool}(false)
-    trajectories_tried = Threads.Atomic{Int}(0)
+    # Atomics for lock-free coordination
+    solution_found = Atomic{Bool}(false)
+    trajectories_tried = Atomic{Int}(0)
+    best_viols = Atomic{Int}(typemax(Int))
+    last_progress = Atomic{Int}(0)
     
-    # Solution storage
+    # Solution storage (only locked when solution found)
     solution_lock = ReentrantLock()
     solution_grid = nothing
     solution_traj_id = 0
-    best_viols = Inf
     
-    # Violation histogram for statistics
-    violation_histogram = Dict{Int,Int}()
+    # Per-thread histograms (no lock contention)
+    thread_histograms = [Dict{Int,Int}() for _ in 1:Threads.nthreads()]
     
     start_time = time()
-    last_update_time = start_time
     
     # Parallel search with early termination
     Threads.@threads for id in 1:R
@@ -319,43 +318,45 @@ function solve_n3l(n::Int, R::Int, T::Float64, seed::UInt64, outdir::String;
         rng = Xoshiro(traj_seed)
         status, x_bin, viols = run_trajectory(cfg, triples, rng)
         
-        # Update counter
-        tried = Threads.atomic_add!(trajectories_tried, 1)
+        # Atomic counter increment (no lock)
+        tried = atomic_add!(trajectories_tried, 1)
         
-        # Check and update results
-        lock(solution_lock) do
-            # Update histogram
-            violation_histogram[viols] = get(violation_histogram, viols, 0) + 1
-            
-            # Check for new best
-            if viols < best_viols
-                best_viols = viols
-                
-                if viols == 0
-                    solution_found[] = true
-                    solution_grid = reshape(x_bin, (n, n))
-                    solution_traj_id = id
-                    
-                    elapsed = time() - start_time
-                    verbose && @printf("\n🎉 SOLUTION FOUND!\n")
-                    verbose && @printf("  Trajectory: %d\n", id)
-                    verbose && @printf("  Time: %.2fs\n", elapsed)
-                    verbose && @printf("  Trajectories tried: %d\n", tried)
-                else
-                    verbose && @printf("[%6d] ★ NEW BEST: %d violations (traj %d)\n", 
-                                      tried, best_viols, id)
+        # Thread-local histogram update (no contention)
+        tid = Threads.threadid()
+        thread_histograms[tid][viols] = get(thread_histograms[tid], viols, 0) + 1
+        
+        # Check for solution
+        if viols == 0
+            if !solution_found[]
+                lock(solution_lock) do
+                    # Double-check after acquiring lock
+                    if !solution_found[]
+                        solution_found[] = true
+                        solution_grid = reshape(x_bin, (n, n))
+                        solution_traj_id = id
+                        elapsed = time() - start_time
+                        verbose && @printf("\n🎉 SOLUTION! traj=%d, time=%.1fs, tried=%d\n", 
+                                          id, elapsed, tried)
+                    end
                 end
             end
-            
-            # Periodic progress updates
-            current_time = time()
-            if tried % progress_interval == 0
-                elapsed = current_time - start_time
+        # Check for new best (atomic CAS - no lock unless we win)
+        elseif viols < best_viols[]
+            old_best = best_viols[]
+            if viols < old_best && atomic_cas!(best_viols, old_best, viols) == old_best
+                verbose && @printf("[%6d] ★ NEW BEST: %d viols (traj %d)\n", tried, viols, id)
+            end
+        end
+        
+        # Progress updates (atomic CAS to prevent spam)
+        if tried - last_progress[] >= progress_interval
+            old = last_progress[]
+            if atomic_cas!(last_progress, old, tried) == old
+                elapsed = time() - start_time
                 rate = tried / elapsed
-                eta_seconds = (R - tried) / rate
-                
-                verbose && @printf("[%6d] Best: %d viols | %.1f traj/s | ETA: %s\n",
-                                  tried, best_viols, rate, format_time(eta_seconds))
+                eta = (R - tried) / rate
+                verbose && @printf("[%6d] best=%d | %.1f/s | eta=%s\n",
+                                  tried, best_viols[], rate, format_time(eta))
             end
         end
         
@@ -367,22 +368,31 @@ function solve_n3l(n::Int, R::Int, T::Float64, seed::UInt64, outdir::String;
     
     elapsed = time() - start_time
     
+    # Merge histograms from all threads
+    violation_histogram = Dict{Int,Int}()
+    for hist in thread_histograms
+        for (v, count) in hist
+            violation_histogram[v] = get(violation_histogram, v, 0) + count
+        end
+    end
+    
     verbose && println("-"^60)
     
     if solution_found[]
         verbose && println("✓✓✓ SUCCESS ✓✓✓")
-        verbose && @printf("Time: %.3fs\n", elapsed)
-        verbose && @printf("Trajectories tried: %d/%d (%.1f%%)\n", 
-                          trajectories_tried[], R, 100*trajectories_tried[]/R)
-        verbose && @printf("Average rate: %.2f trajectories/second\n", trajectories_tried[]/elapsed)
+        verbose && @printf("Time: %.2fs | Tried: %d/%d (%.1f%%) | Rate: %.1f/s\n", 
+                          elapsed, trajectories_tried[], R, 
+                          100*trajectories_tried[]/R, trajectories_tried[]/elapsed)
         
         # Print violation distribution
-        verbose && println("\nViolation distribution:")
-        for v in sort(collect(keys(violation_histogram)))
-            count = violation_histogram[v]
-            pct = 100 * count / trajectories_tried[]
-            bar = repeat("█", min(50, round(Int, pct)))
-            verbose && @printf("  %2d violations: %5d (%.2f%%) %s\n", v, count, pct, bar)
+        if !isempty(violation_histogram)
+            verbose && println("\nViolation distribution:")
+            for v in sort(collect(keys(violation_histogram)))
+                count = violation_histogram[v]
+                pct = 100 * count / trajectories_tried[]
+                bar = repeat("█", min(40, round(Int, pct/2)))
+                verbose && @printf("  %2d violations: %5d (%5.2f%%) %s\n", v, count, pct, bar)
+            end
         end
         
         verbose && println("\nSolution:")
@@ -392,18 +402,18 @@ function solve_n3l(n::Int, R::Int, T::Float64, seed::UInt64, outdir::String;
         return true, solution_grid, elapsed, Dict(:success=>1, :tried=>trajectories_tried[]), seed
     else
         verbose && println("✗✗✗ NO SOLUTION FOUND ✗✗✗")
-        verbose && @printf("Time: %.3fs\n", elapsed)
-        verbose && @printf("Trajectories tried: %d\n", trajectories_tried[])
-        verbose && @printf("Best achieved: %d violations\n", best_viols)
-        verbose && @printf("Average rate: %.2f trajectories/second\n", trajectories_tried[]/elapsed)
+        verbose && @printf("Time: %.2fs | Tried: %d | Best: %d viols | Rate: %.1f/s\n", 
+                          elapsed, trajectories_tried[], best_viols[], trajectories_tried[]/elapsed)
         
         # Print violation distribution
-        verbose && println("\nViolation distribution:")
-        for v in sort(collect(keys(violation_histogram)))
-            count = violation_histogram[v]
-            pct = 100 * count / trajectories_tried[]
-            bar = repeat("█", min(50, round(Int, pct)))
-            verbose && @printf("  %2d violations: %5d (%.2f%%) %s\n", v, count, pct, bar)
+        if !isempty(violation_histogram)
+            verbose && println("\nViolation distribution:")
+            for v in sort(collect(keys(violation_histogram)))
+                count = violation_histogram[v]
+                pct = 100 * count / trajectories_tried[]
+                bar = repeat("█", min(40, round(Int, pct/2)))
+                verbose && @printf("  %2d violations: %5d (%5.2f%%) %s\n", v, count, pct, bar)
+            end
         end
         
         return false, nothing, elapsed, Dict(:success=>0, :tried=>trajectories_tried[]), seed
