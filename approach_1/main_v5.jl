@@ -513,7 +513,7 @@ function main()
         alpha_str = isnothing(alpha_override) ? "" : " --alpha $(alpha_override)"
         gamma_str = isnothing(gamma_override) ? "" : " --gamma $(gamma_override)"
         println("Reproduce exact solution:")
-        println("  julia --threads=12 $(PROGRAM_FILE) $(n) --R $(R) --T $(T)$(alpha_str)$(gamma_str) --seed $(used_seed)")
+        println("julia --project=. --threads=12 $(PROGRAM_FILE) $(n) --R $(R) --T $(T)$(alpha_str)$(gamma_str) --seed $(used_seed)")
     end
     
     return success ? 0 : 1
