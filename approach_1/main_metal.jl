@@ -202,7 +202,10 @@ end
         # ---- Compute k2 = f(x + dt/2 * k1) ----
         half_dt = dt * 0.5f0
         for i in Int32(1):N
-            @inbounds xtmp[i] = state[i, traj] + half_dt * k1[i]
+            @inbounds begin
+                xi_new = state[i, traj] + half_dt * k1[i]
+                xtmp[i] = min(1.0f0, max(0.0f0, xi_new))  # Clamp to [0,1]
+            end
         end
         for i in Int32(1):N
             xi = @inbounds xtmp[i]
@@ -220,7 +223,10 @@ end
 
         # ---- Compute k3 = f(x + dt/2 * k2) ----
         for i in Int32(1):N
-            @inbounds xtmp[i] = state[i, traj] + half_dt * k2[i]
+            @inbounds begin
+                xi_new = state[i, traj] + half_dt * k2[i]
+                xtmp[i] = min(1.0f0, max(0.0f0, xi_new))  # Clamp to [0,1]
+            end
         end
         for i in Int32(1):N
             xi = @inbounds xtmp[i]
@@ -238,7 +244,10 @@ end
 
         # ---- Compute k4 = f(x + dt * k3) ----
         for i in Int32(1):N
-            @inbounds xtmp[i] = state[i, traj] + dt * k3[i]
+            @inbounds begin
+                xi_new = state[i, traj] + dt * k3[i]
+                xtmp[i] = min(1.0f0, max(0.0f0, xi_new))  # Clamp to [0,1]
+            end
         end
         for i in Int32(1):N
             xi = @inbounds xtmp[i]
