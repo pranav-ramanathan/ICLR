@@ -1,0 +1,25 @@
+# n=4
+# target=8
+# trajectory_id=2
+# R=500
+# T=10.0
+# seed=6063963436905196232
+# α=6.666666666666666, β=1.0, γ=5.0
+# solver=Metal GPU (EnsembleGPUKernel + GPUTsit5)
+# timestamp=2026-02-09T18:12:21Z
+#
+# Grid (0/1):
+0 1 1 0
+1 0 0 1
+0 1 1 0
+1 0 0 1
+#
+# Coordinates (row, col):
+(1, 2)
+(1, 3)
+(2, 1)
+(2, 4)
+(3, 2)
+(3, 3)
+(4, 1)
+(4, 4)
