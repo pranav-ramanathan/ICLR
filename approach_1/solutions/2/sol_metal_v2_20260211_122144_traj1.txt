@@ -1,0 +1,19 @@
+# n=2
+# target=4
+# trajectory_id=1
+# R=5000
+# T=10.0
+# seed=17470124328477549040
+# α=3.3333333, β=1.0, γ=5.0
+# method=Metal GPU Line-Based Custom RK4 Kernel
+# timestamp=2026-02-11T12:21:44Z
+#
+# Grid (0/1):
+1 1
+1 1
+#
+# Coordinates (row, col):
+(1, 1)
+(1, 2)
+(2, 1)
+(2, 2)
