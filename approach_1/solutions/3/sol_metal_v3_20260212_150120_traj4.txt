@@ -1,0 +1,23 @@
+# n=3
+# target=6
+# trajectory_id=4
+# R=5000
+# T=10.0
+# seed=420469470382875274
+# α=5.0, β=1.0, γ=5.0
+# method=Metal GPU Line-Based Custom RK4 Kernel (v3)
+# col_normalization=mean-incidence
+# timestamp=2026-02-12T15:01:20Z
+#
+# Grid (0/1):
+0 1 1
+1 0 1
+1 1 0
+#
+# Coordinates (row, col):
+(1, 2)
+(1, 3)
+(2, 1)
+(2, 3)
+(3, 1)
+(3, 2)
