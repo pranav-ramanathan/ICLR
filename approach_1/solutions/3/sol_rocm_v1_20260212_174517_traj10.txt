@@ -1,0 +1,23 @@
+# n=3
+# target=6
+# trajectory_id=10
+# R=5120
+# T=15.0
+# seed=221144935657157939
+# α=5.0, β=1.0, γ=5.0
+# method=ROCm AMDGPU Line-Based Custom RK4 Kernel (v1)
+# col_normalization=mean-incidence
+# timestamp=2026-02-12T17:45:17Z
+#
+# Grid (0/1):
+1 1 0
+1 0 1
+0 1 1
+#
+# Coordinates (row, col):
+(1, 1)
+(1, 2)
+(2, 1)
+(2, 3)
+(3, 2)
+(3, 3)

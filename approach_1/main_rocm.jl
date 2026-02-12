@@ -846,8 +846,9 @@ function main()
     verbose && println("Checking ROCm AMD GPU...")
     try
         AMDGPU.functional() || error("AMDGPU not functional. Install/configure ROCm runtime first.")
-        AMDGPU.versioninfo()
-        dev = AMDGPU.devices()[1]
+        devs = AMDGPU.devices()
+        isempty(devs) && error("No AMDGPU devices found")
+        dev = devs[1]
         verbose && println("  Device: $(dev)")
     catch e
         println("ERROR: No ROCm-capable AMD GPU runtime available: $e")
