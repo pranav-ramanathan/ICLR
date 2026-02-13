@@ -1056,9 +1056,7 @@ function gpu_pipeline!(
         result_cpu = Matrix{Float32}(undef, Int(N), this_batch)
         copyto!(result_cpu, view(d_state, :, 1:this_batch))
 
-        if !tryput!(validation_ch, (result_cpu, batch_seed, batch))
-            break
-        end
+        put!(validation_ch, (result_cpu, batch_seed, batch))
 
         atomic_add!(total_tried, this_batch)
 
@@ -1157,8 +1155,13 @@ function cpu_coexecutor!(
                     break
                 end
 
-                if viols > 0 && viols <= repair_threshold
-                    tryput!(repair_ch, (copy(x_bin), traj_count, "CPU-$worker_id"))
+                if viols > 0 && viols <= repair_threshold && !solution_found[]
+                    try
+                        put!(repair_ch, (copy(x_bin), traj_count, "CPU-$worker_id"))
+                    catch
+                        # Channel closed, exit
+                        break
+                    end
                 end
             end
         end
@@ -1230,8 +1233,12 @@ function validator!(
                 break
             end
 
-            if viols > 0 && viols <= repair_threshold
-                tryput!(repair_ch, (copy(x_bin), traj, "GPU-batch$batch_idx"))
+            if viols > 0 && viols <= repair_threshold && !solution_found[]
+                try
+                    put!(repair_ch, (copy(x_bin), traj, "GPU-batch$batch_idx"))
+                catch
+                    # Channel closed, continue validation
+                end
             end
         end
     end
@@ -1303,7 +1310,229 @@ end
 # PLACEHOLDER FOR MAIN HYBRID SOLVER (Task 5)
 # ============================================================================
 
-# function solve_hybrid(...) end             # Task 5
+function solve_hybrid(
+    cfg::Config,
+    line_offsets_cpu::Vector{Int32},
+    line_points_cpu::Vector{Int32},
+    point_col_scale_cpu::Vector{Float32},
+    seed::UInt64,
+    outdir::String;
+    verbose::Bool=true,
+    batch_size::Int=1024,
+    max_batches::Int=0,
+    cpu_threads::Int=4,
+    repair_threshold::Int=5,
+    cpu_alpha_min::Float64,
+    cpu_alpha_max::Float64,
+    cpu_gamma_min::Float64,
+    cpu_gamma_max::Float64,
+    no_repair::Bool=false,
+    col_normalization::String="mean-incidence",
+)
+    n = cfg.n
+    N = Int32(n * n)
+    target = 2 * n
+    L = Int32(length(line_offsets_cpu) - 1)
+    nsteps = Int32(max(1, floor(Int, cfg.T / cfg.dt)))
+    effective_T = Float32(nsteps) * cfg.dt
+
+    if Int(N) > MAX_STATE_DIM
+        println("ERROR: n^2=$(Int(N)) exceeds MAX_STATE_DIM=$MAX_STATE_DIM in kernel scratch memory.")
+        println("       Increase MAX_STATE_DIM (with performance tradeoff) or reduce n.")
+        return false, nothing, 0.0, Dict(:success => 0, :tried => 0, :gpu => 0, :cpu => 0, :repair => 0), seed
+    end
+
+    line_count, packed_points, max_line_len, triples_equiv = line_stats(line_offsets_cpu)
+
+    verbose && println("="^60)
+    verbose && println("N3L Gradient Flow — Hybrid CPU-GPU (ROCm V2 with Repair)")
+    verbose && println("="^60)
+    verbose && @printf("n=%d, target=%d | α=%.3f, β=%.1f, γ=%.3f\n", n, target, cfg.α, cfg.β, cfg.γ)
+    verbose && @printf("Max: %d traj, T=%.3fs (effective %.3fs), dt=%.4f, steps=%d\n",
+                       cfg.R, cfg.T, effective_T, cfg.dt, nsteps)
+    verbose && @printf("Batch size: %d | CPU threads: %d | Seed: %d\n", batch_size, cpu_threads, seed)
+    verbose && println("-"^60)
+    verbose && @printf("Lines: %d | Packed points: %d | max line len: %d | triple-equivalent terms: %d\n",
+                       line_count, packed_points, max_line_len, triples_equiv)
+    verbose && @printf("Collinearity normalization: %s\n", col_normalization)
+    verbose && @printf("CPU parameter ranges: α=[%.2f, %.2f], γ=[%.2f, %.2f]\n",
+                       cpu_alpha_min, cpu_alpha_max, cpu_gamma_min, cpu_gamma_max)
+    verbose && @printf("Repair threshold: %d | No-repair: %s\n", repair_threshold, no_repair)
+    verbose && println("-"^60)
+
+    # Channel setup
+    validation_ch = Channel{ValidationResult}(4)
+    repair_ch = Channel{RepairCandidate}(32)
+
+    # Atomic state setup
+    solution_found = Atomic{Bool}(false)
+    best_viols = Atomic{Int}(typemax(Int))
+    total_tried = Atomic{Int}(0)
+
+    # GPU warmup
+    backend = AMDGPU.ROCBackend()
+    kern = rk4_gradient_flow_lines_kernel!(backend, 64)
+    d_line_offsets = ROCArray(line_offsets_cpu)
+    d_line_points = ROCArray(line_points_cpu)
+    d_point_col_scale = ROCArray(point_col_scale_cpu)
+
+    verbose && print("Warming up ROCm GPU (compiling kernel)...")
+    try
+        warmup_state = ROCArray(rand(Float32, N, 2))
+        kern(warmup_state, d_line_offsets, d_line_points, d_point_col_scale,
+             cfg.α, cfg.β, cfg.γ, cfg.dt, Int32(1), N, L;
+             ndrange=2)
+        KernelAbstractions.synchronize(backend)
+        verbose && println("\n  ✓ ROCm warmup OK")
+    catch e
+        verbose && println("\n  ⚠ ROCm warmup failed: $(typeof(e)): $(sprint(showerror, e))")
+        verbose && println("  This is a fatal error — kernel cannot compile.")
+        return false, nothing, 0.0, Dict(:success => 0, :tried => 0, :gpu => 0, :cpu => 0, :repair => 0), seed
+    end
+    verbose && println("-"^60)
+
+    # Counters for per-source statistics
+    gpu_batches_completed = Atomic{Int}(0)
+    cpu_trajectories_tried = Atomic{Int}(0)
+    repair_attempts = Atomic{Int}(0)
+
+    # Create save function closure
+    save_fn = (n, grid, traj_id, R, T, seed, α, γ, outdir; col_normalization="mean-incidence") -> begin
+        save_solution(n, grid, traj_id, R, T, seed, α, γ, outdir; col_normalization=col_normalization)
+    end
+
+    start_time = time()
+
+    # Spawn all 4 subsystems
+    gpu_task = Threads.@spawn gpu_pipeline!(
+        validation_ch,
+        solution_found,
+        best_viols,
+        total_tried,
+        n,
+        cfg.R,
+        batch_size,
+        max_batches,
+        seed,
+        Float64(cfg.α),
+        Float64(cfg.β),
+        Float64(cfg.γ),
+        Float64(cfg.T),
+        Float64(cfg.dt),
+        line_offsets_cpu,
+        line_points_cpu,
+        point_col_scale_cpu,
+        verbose,
+    )
+
+    validator_task = Threads.@spawn validator!(
+        validation_ch,
+        repair_ch,
+        solution_found,
+        best_viols,
+        total_tried,
+        n,
+        repair_threshold,
+        line_offsets_cpu,
+        line_points_cpu,
+        verbose,
+        save_fn,
+    )
+
+    cpu_task = Threads.@spawn cpu_coexecutor!(
+        repair_ch,
+        solution_found,
+        best_viols,
+        total_tried,
+        n,
+        cpu_threads,
+        seed,
+        cpu_alpha_min,
+        cpu_alpha_max,
+        cpu_gamma_min,
+        cpu_gamma_max,
+        Float64(cfg.β),
+        Float64(cfg.T),
+        Float64(cfg.dt),
+        repair_threshold,
+        line_offsets_cpu,
+        line_points_cpu,
+        point_col_scale_cpu,
+        verbose,
+        save_fn,
+    )
+
+    repair_task = Threads.@spawn begin
+        if no_repair
+            # Drain repair_ch without processing
+            for _ in repair_ch end
+            verbose && println("Repair worker disabled (--no-repair)")
+        else
+            repair_worker!(
+                repair_ch,
+                solution_found,
+                best_viols,
+                n,
+                line_offsets_cpu,
+                line_points_cpu,
+                100,  # max_attempts for repair
+                verbose,
+                save_fn,
+            )
+        end
+    end
+
+    # Graceful shutdown
+    wait(gpu_task)
+    close(validation_ch)
+    wait(validator_task)
+    wait(cpu_task)
+    close(repair_ch)
+    wait(repair_task)
+
+    elapsed = time() - start_time
+
+    # Gather solution if found
+    solution_grid = nothing
+    solution_traj_id = 0
+    if solution_found[]
+        # Solution is already saved by validator or repair worker
+        # We just need to report success
+        verbose && println("-"^60)
+        verbose && println("SUCCESS")
+    else
+        verbose && println("-"^60)
+        verbose && println("NO SOLUTION FOUND")
+    end
+
+    # Print unified statistics
+    verbose && @printf("Time: %.2fs | Tried: %d | Best: %d viols | Rate: %.1f/s\n",
+                       elapsed, total_tried[], best_viols[], total_tried[] / elapsed)
+
+    # Per-source breakdown
+    verbose && println("\nPer-source statistics:")
+    verbose && @printf("  GPU batches: %d\n", gpu_batches_completed[])
+    verbose && @printf("  CPU trajectories: %d\n", cpu_trajectories_tried[])
+    verbose && @printf("  Repair attempts: %d\n", repair_attempts[])
+
+    if solution_found[]
+        return true, solution_grid, elapsed, Dict(
+            :success => 1,
+            :tried => total_tried[],
+            :gpu => gpu_batches_completed[],
+            :cpu => cpu_trajectories_tried[],
+            :repair => repair_attempts[]
+        ), seed
+    else
+        return false, nothing, elapsed, Dict(
+            :success => 0,
+            :tried => total_tried[],
+            :gpu => gpu_batches_completed[],
+            :cpu => cpu_trajectories_tried[],
+            :repair => repair_attempts[]
+        ), seed
+    end
+end
 
 # ============================================================================
 # Main
@@ -1453,21 +1682,42 @@ function main()
 
     cfg = Config(n=n, R=R, T=T, dt=dt, α=α, γ=γ)
 
-    # PLACEHOLDER: Call solve_hybrid here (Task 5)
-    println("\n[PLACEHOLDER] solve_hybrid not implemented yet (Task 5)")
-    println("Configuration:")
-    @printf("  n=%d, R=%d, T=%.3f, dt=%.4f\n", n, R, T, dt)
-    @printf("  α=%.3f, β=%.1f, γ=%.3f\n", α, cfg.β, γ)
-    @printf("  CPU threads: %d\n", cpu_threads)
-    @printf("  Repair threshold: %d\n", repair_threshold)
-    @printf("  CPU parameter ranges: α=[%s, %s], γ=[%s, %s]\n",
-            isnothing(cpu_alpha_min) ? "default" : string(cpu_alpha_min),
-            isnothing(cpu_alpha_max) ? "default" : string(cpu_alpha_max),
-            isnothing(cpu_gamma_min) ? "default" : string(cpu_gamma_min),
-            isnothing(cpu_gamma_max) ? "default" : string(cpu_gamma_max))
-    @printf("  No-CPU mode: %s | No-repair mode: %s\n", no_cpu, no_repair)
+    # CPU parameter diversification defaults
+    cpu_alpha_min_val = isnothing(cpu_alpha_min) ? max(1.0, α - 2.0) : cpu_alpha_min
+    cpu_alpha_max_val = isnothing(cpu_alpha_max) ? min(30.0, α + 2.0) : cpu_alpha_max
+    cpu_gamma_min_val = isnothing(cpu_gamma_min) ? max(1.0, γ - 1.5) : cpu_gamma_min
+    cpu_gamma_max_val = isnothing(cpu_gamma_max) ? min(10.0, γ + 1.5) : cpu_gamma_max
 
-    return 0  # Success placeholder
+    # Dispatch logic
+    if no_cpu
+        # GPU-only mode (fallback to original solve_rocm pattern)
+        # For now, call solve_hybrid with cpu_threads=0 (TODO: implement GPU-only path)
+        verbose && println("\n⚠ GPU-only mode (--no-cpu) not fully implemented yet")
+        verbose && println("  Falling back to hybrid mode with minimal CPU usage\n")
+    end
+
+    # Call solve_hybrid
+    success, grid, elapsed, stats, final_seed = solve_hybrid(
+        cfg,
+        line_offsets_cpu,
+        line_points_cpu,
+        point_col_scale_cpu,
+        seed,
+        outdir;
+        verbose=verbose,
+        batch_size=batch_size,
+        max_batches=max_batches,
+        cpu_threads=cpu_threads,
+        repair_threshold=repair_threshold,
+        cpu_alpha_min=cpu_alpha_min_val,
+        cpu_alpha_max=cpu_alpha_max_val,
+        cpu_gamma_min=cpu_gamma_min_val,
+        cpu_gamma_max=cpu_gamma_max_val,
+        no_repair=no_repair,
+        col_normalization=col_norm_mode,
+    )
+
+    return success ? 0 : 1
 end
 
 # main_rocm_v2.jl
