@@ -1156,12 +1156,20 @@ function cpu_coexecutor!(
                 end
 
                 if viols > 0 && viols <= repair_threshold && !solution_found[]
-                    try
-                        put!(repair_ch, (copy(x_bin), traj_count, "CPU-$worker_id"))
-                    catch
-                        # Channel closed, exit
-                        break
+                    # Non-blocking channel put using @async
+                    # If channel is closed or solution found, the async task will handle it
+                    if isopen(repair_ch) && !solution_found[]
+                        @async try
+                            put!(repair_ch, (copy(x_bin), traj_count, "CPU-$worker_id"))
+                        catch
+                            # Channel closed, ignore
+                        end
                     end
+                end
+                
+                # Check solution_found again before next iteration
+                if solution_found[]
+                    break
                 end
             end
         end
