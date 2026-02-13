@@ -60,6 +60,10 @@ Base.@kwdef struct Config
     γ::Float32 = 4.5f0
 end
 
+# Channel payload types for concurrent subsystem communication.
+const ValidationResult = Tuple{Matrix{Float32}, UInt64, Int}  # (result_batch, seed, batch_idx)
+const RepairCandidate = Tuple{BitVector, Int, String}         # (x_bin, traj_id, source)
+
 @inline function legacy_coefficients(n::Int)
     α = n <= 10 ? Float32(10.0 * (n / 6)) : 40.0f0
     γ = n <= 10 ? 5.0f0 : 15.0f0
@@ -983,15 +987,317 @@ function save_solution(n, grid, traj_id, R, T, seed, α, γ, outdir; col_normali
 end
 
 # ============================================================================
-# PLACEHOLDERS FOR SUBSYSTEMS (Tasks 2-4)
+# Concurrent Subsystems (Task 4)
 # ============================================================================
 
-# function cpu_rk4_integrator!(...) end      # Task 2
-# function local_search_repair(...) end      # Task 3
-# function gpu_pipeline!(...) end            # Task 4
-# function cpu_coexecutor!(...) end          # Task 4
-# function validator!(...) end               # Task 4
-# function repair_worker!(...) end           # Task 4
+function gpu_pipeline!(
+    validation_ch::Channel{ValidationResult},
+    solution_found::Atomic{Bool},
+    best_viols::Atomic{Int},
+    total_tried::Atomic{Int},
+    n::Int,
+    R::Int,
+    batch_size::Int,
+    max_batches::Int,
+    seed::UInt64,
+    α::Float64,
+    β::Float64,
+    γ::Float64,
+    T::Float64,
+    dt::Float64,
+    line_offsets::Vector{Int32},
+    line_points::Vector{Int32},
+    point_col_scale::Vector{Float32},
+    verbose::Bool,
+)
+    _ = best_viols
+
+    N = Int32(n * n)
+    L = Int32(length(line_offsets) - 1)
+    backend = AMDGPU.ROCBackend()
+    d_state = ROCArray{Float32}(undef, Int(N), batch_size)
+    d_line_offsets = ROCArray(line_offsets)
+    d_line_points = ROCArray(line_points)
+    d_point_col_scale = ROCArray(point_col_scale)
+    kernel! = rk4_gradient_flow_lines_kernel!(backend)
+
+    nsteps = round(Int32, T / dt)
+    num_batches = cld(R, batch_size)
+    if max_batches > 0
+        num_batches = min(num_batches, max_batches)
+    end
+
+    for batch in 1:num_batches
+        solution_found[] && break
+
+        this_batch = min(batch_size, R - (batch - 1) * batch_size)
+        this_batch <= 0 && break
+
+        batch_seed = splitmix64(seed ⊻ UInt64(batch))
+        ic = generate_initial_conditions(n, this_batch, batch_seed)
+        copyto!(view(d_state, :, 1:this_batch), ic)
+
+        kernel!(
+            d_state,
+            d_line_offsets,
+            d_line_points,
+            d_point_col_scale,
+            Float32(α),
+            Float32(β),
+            Float32(γ),
+            Float32(dt),
+            nsteps,
+            N,
+            L;
+            ndrange=this_batch,
+        )
+        KernelAbstractions.synchronize(backend)
+
+        result_cpu = Matrix{Float32}(undef, Int(N), this_batch)
+        copyto!(result_cpu, view(d_state, :, 1:this_batch))
+
+        if !tryput!(validation_ch, (result_cpu, batch_seed, batch))
+            break
+        end
+
+        atomic_add!(total_tried, this_batch)
+
+        if verbose
+            println("GPU batch $batch/$num_batches complete ($this_batch trajectories)")
+        end
+    end
+
+    verbose && println("GPU pipeline complete")
+end
+
+function cpu_coexecutor!(
+    repair_ch::Channel{RepairCandidate},
+    solution_found::Atomic{Bool},
+    best_viols::Atomic{Int},
+    total_tried::Atomic{Int},
+    n::Int,
+    cpu_threads::Int,
+    base_seed::UInt64,
+    α_min::Float64,
+    α_max::Float64,
+    γ_min::Float64,
+    γ_max::Float64,
+    β::Float64,
+    T::Float64,
+    dt::Float64,
+    repair_threshold::Int,
+    line_offsets::Vector{Int32},
+    line_points::Vector{Int32},
+    point_col_scale::Vector{Float32},
+    verbose::Bool,
+    save_fn::Function,
+)
+    tasks = Task[]
+
+    for worker_id in 1:cpu_threads
+        task = Threads.@spawn begin
+            N = n * n
+            L = length(line_offsets) - 1
+            nsteps = round(Int, T / dt)
+
+            rng = Xoshiro(splitmix64(base_seed ⊻ UInt64(worker_id)))
+            α_worker = α_min + (α_max - α_min) * rand(rng)
+            γ_worker = γ_min + (γ_max - γ_min) * rand(rng)
+
+            traj_count = 0
+            while !solution_found[]
+                traj_count += 1
+                traj_seed = splitmix64(base_seed ⊻ UInt64(worker_id) ⊻ UInt64(traj_count))
+
+                state = cpu_generate_initial_condition(n, traj_seed)
+                cpu_rk4_integrate!(
+                    state,
+                    line_offsets,
+                    line_points,
+                    point_col_scale,
+                    α_worker,
+                    β,
+                    γ_worker,
+                    dt,
+                    nsteps,
+                    N,
+                    L,
+                )
+
+                x_bin = topk_mask(state, 2 * n)
+                viols = count_violations_lines(x_bin, line_offsets, line_points)
+
+                atomic_add!(total_tried, 1)
+
+                current_best = best_viols[]
+                while viols < current_best
+                    if atomic_cas!(best_viols, current_best, viols) == current_best
+                        verbose && println("CPU worker $worker_id: new best = $viols")
+                        break
+                    end
+                    current_best = best_viols[]
+                end
+
+                if viols == 0
+                    solution_found[] = true
+                    grid = reshape(x_bin, (n, n))
+                    save_fn(
+                        n,
+                        grid,
+                        traj_count,
+                        0,
+                        T,
+                        UInt64(traj_seed),
+                        α_worker,
+                        γ_worker,
+                        "solutions";
+                        col_normalization="mean-incidence",
+                    )
+                    verbose && println("CPU worker $worker_id: SOLUTION FOUND (traj $traj_count)")
+                    break
+                end
+
+                if viols > 0 && viols <= repair_threshold
+                    tryput!(repair_ch, (copy(x_bin), traj_count, "CPU-$worker_id"))
+                end
+            end
+        end
+        push!(tasks, task)
+    end
+
+    for task in tasks
+        wait(task)
+    end
+
+    verbose && println("CPU co-executor complete ($cpu_threads workers)")
+end
+
+function validator!(
+    validation_ch::Channel{ValidationResult},
+    repair_ch::Channel{RepairCandidate},
+    solution_found::Atomic{Bool},
+    best_viols::Atomic{Int},
+    total_tried::Atomic{Int},
+    n::Int,
+    repair_threshold::Int,
+    line_offsets::Vector{Int32},
+    line_points::Vector{Int32},
+    verbose::Bool,
+    save_fn::Function,
+)
+    _ = total_tried
+
+    batch_count = 0
+    for (result_batch, batch_seed, batch_idx) in validation_ch
+        solution_found[] && break
+        batch_count += 1
+
+        this_batch = size(result_batch, 2)
+
+        for traj in 1:this_batch
+            solution_found[] && break
+
+            x_continuous = @view result_batch[:, traj]
+            x_bin = topk_mask(x_continuous, 2 * n)
+            viols = count_violations_lines(x_bin, line_offsets, line_points)
+
+            current_best = best_viols[]
+            while viols < current_best
+                if atomic_cas!(best_viols, current_best, viols) == current_best
+                    verbose && println("GPU batch $batch_idx: new best = $viols")
+                    break
+                end
+                current_best = best_viols[]
+            end
+
+            if viols == 0
+                solution_found[] = true
+                grid = reshape(x_bin, (n, n))
+                traj_seed = splitmix64(batch_seed ⊻ UInt64(traj))
+                save_fn(
+                    n,
+                    grid,
+                    traj,
+                    0,
+                    0.0,
+                    traj_seed,
+                    0.0,
+                    0.0,
+                    "solutions";
+                    col_normalization="mean-incidence",
+                )
+                verbose && println("GPU batch $batch_idx: SOLUTION FOUND (traj $traj)")
+                break
+            end
+
+            if viols > 0 && viols <= repair_threshold
+                tryput!(repair_ch, (copy(x_bin), traj, "GPU-batch$batch_idx"))
+            end
+        end
+    end
+
+    verbose && println("Validator complete (processed $batch_count batches)")
+end
+
+function repair_worker!(
+    repair_ch::Channel{RepairCandidate},
+    solution_found::Atomic{Bool},
+    best_viols::Atomic{Int},
+    n::Int,
+    line_offsets::Vector{Int32},
+    line_points::Vector{Int32},
+    max_attempts::Int,
+    verbose::Bool,
+    save_fn::Function,
+)
+    repair_count = 0
+    success_count = 0
+
+    for (x_bin, traj_id, source) in repair_ch
+        solution_found[] && break
+        repair_count += 1
+
+        repaired, final_viols = repair_near_solution!(
+            x_bin,
+            n,
+            2 * n,
+            line_offsets,
+            line_points;
+            max_attempts=max_attempts,
+        )
+
+        current_best = best_viols[]
+        while final_viols < current_best
+            if atomic_cas!(best_viols, current_best, final_viols) == current_best
+                verbose && println("Repair ($source): new best = $final_viols")
+                break
+            end
+            current_best = best_viols[]
+        end
+
+        if final_viols == 0
+            solution_found[] = true
+            success_count += 1
+            grid = reshape(repaired, (n, n))
+            save_fn(
+                n,
+                grid,
+                traj_id,
+                0,
+                0.0,
+                UInt64(0),
+                0.0,
+                0.0,
+                "solutions";
+                col_normalization="mean-incidence",
+            )
+            verbose && println("Repair ($source): SOLUTION FOUND (repaired from traj $traj_id)")
+            break
+        end
+    end
+
+    verbose && println("Repair worker complete (processed $repair_count, repaired $success_count)")
+end
 
 # ============================================================================
 # PLACEHOLDER FOR MAIN HYBRID SOLVER (Task 5)
