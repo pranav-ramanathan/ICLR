@@ -42,18 +42,16 @@ function _scale_triplet(raw::AbstractVector{<:Real}, cfg::NeuralScheduleConfig)
 end
 
 function predict_schedule(model, ps, st, n::Int, K::Int, cfg::NeuralScheduleConfig)
-    αs = Vector{Float32}(undef, K)
-    γs = Vector{Float32}(undef, K)
-    δs = Vector{Float32}(undef, K)
-    st_local = st
-
-    for k in 1:K
+    # Stateless forward for AD stability (our MLP has no meaningful mutable state).
+    triples = map(1:K) do k
         x = _feature(n, k, K)
-        y, st_local = Lux.apply(model, x, ps, st_local)
-        αs[k], γs[k], δs[k] = _scale_triplet(y, cfg)
+        y, _ = Lux.apply(model, x, ps, st)
+        _scale_triplet(y, cfg)
     end
-
-    return αs, γs, δs, st_local
+    αs = Float32[t[1] for t in triples]
+    γs = Float32[t[2] for t in triples]
+    δs = Float32[t[3] for t in triples]
+    return αs, γs, δs, st
 end
 
 # v1 supervised training target: distill the existing adaptive heuristic into a neural schedule.
@@ -84,6 +82,8 @@ function _teacher_schedule(n::Int, K::Int, cfg::NeuralScheduleConfig)
     return αs, γs, δs
 end
 
+Zygote.@nograd _teacher_schedule
+
 function train_schedule_model!(; hidden::Int=64, chunks::Int=16, epochs::Int=400, lr::Float32=1e-3f0,
                                seed::UInt64=0xBEEF, n_min::Int=8, n_max::Int=20, verbose::Bool=true)
     cfg = NeuralScheduleConfig(hidden=hidden, chunks=chunks)
@@ -95,16 +95,24 @@ function train_schedule_model!(; hidden::Int=64, chunks::Int=16, epochs::Int=400
     opt_state = Optimisers.setup(opt, ps)
 
     ns = collect(n_min:n_max)
+    teacher = Dict{Int,NTuple{3,Vector{Float32}}}()
+    for n in ns
+        α_t, γ_t, δ_t = _teacher_schedule(n, chunks, cfg)
+        teacher[n] = (α_t, γ_t, δ_t)
+    end
 
     loss_of(p) = begin
         total = 0.0f0
-        st_tmp = st
         for n in ns
-            α_pred, γ_pred, δ_pred, st_tmp = predict_schedule(model, p, st_tmp, n, chunks, cfg)
-            α_t, γ_t, δ_t = _teacher_schedule(n, chunks, cfg)
-            total += sum((α_pred .- α_t).^2) / chunks
-            total += sum((γ_pred .- γ_t).^2) / chunks
-            total += sum((δ_pred .- δ_t).^2) / chunks
+            α_t, γ_t, δ_t = teacher[n]
+            for k in 1:chunks
+                x = _feature(n, k, chunks)
+                y, _ = Lux.apply(model, x, p, st)
+                αp, γp, δp = _scale_triplet(y, cfg)
+                total += (αp - α_t[k])^2 / chunks
+                total += (γp - γ_t[k])^2 / chunks
+                total += (δp - δ_t[k])^2 / chunks
+            end
         end
         total / length(ns)
     end

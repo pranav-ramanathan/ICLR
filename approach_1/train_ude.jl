@@ -5,7 +5,7 @@ using .UDEModel
 using ArgParse
 using Dates
 
-function parse_args(args)
+function parse_cli_args(args)
     s = ArgParseSettings(description="Train neural UDE v1 schedule model (ROCm deployment-compatible)")
     @add_arg_table! s begin
         "--epochs"
@@ -35,11 +35,11 @@ function parse_args(args)
         "--quiet", "-q"
             action = :store_true
     end
-    parse_args(args, s)
+    return ArgParse.parse_args(args, s)
 end
 
 function main()
-    args = parse_args(ARGS)
+    args = parse_cli_args(ARGS)
     verbose = !args["quiet"]
 
     model, ps, st, cfg = train_schedule_model!(;
