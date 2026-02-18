@@ -10,6 +10,7 @@ include("main_metal_v3.jl")
 using Random
 using Printf
 using ArgParse
+include("logging_utils.jl")
 
 Base.@kwdef mutable struct UDEConfig
     n::Int
@@ -137,5 +138,7 @@ function main()
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    exit(main())
+    exit(run_with_terminal_log("ude_metal_v1", ARGS) do
+        main()
+    end)
 end
