@@ -20,6 +20,7 @@ using Random
 using Printf
 using Dates
 using ArgParse
+include("logging_utils.jl")
 using Base.Threads: Atomic, atomic_add!, atomic_cas!
 
 # ============================================================================
@@ -791,5 +792,7 @@ function main()
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    exit(main())
+    exit(run_with_terminal_log("cpu_v6", ARGS) do
+        main()
+    end)
 end

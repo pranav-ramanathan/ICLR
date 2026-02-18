@@ -17,6 +17,7 @@ using Random
 using Printf
 using Dates
 using ArgParse
+include("logging_utils.jl")
 
 const MAX_STATE_DIM = 1024  # kernel private scratch limit (supports n <= 32)
 
@@ -929,5 +930,7 @@ function main()
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    exit(main())
+    exit(run_with_terminal_log("metal_v3", ARGS) do
+        main()
+    end)
 end

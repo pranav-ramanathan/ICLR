@@ -4,6 +4,7 @@ include("ude_model.jl")
 using .UDEModel
 using ArgParse
 using Dates
+include("logging_utils.jl")
 
 function parse_cli_args(args)
     s = ArgParseSettings(description="Train neural UDE v1 schedule model (ROCm deployment-compatible)")
@@ -69,5 +70,7 @@ function main()
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    exit(main())
+    exit(run_with_terminal_log("ude_train_v1", ARGS) do
+        main()
+    end)
 end
