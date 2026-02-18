@@ -26,7 +26,8 @@ if !isdefined(Main, :run_with_terminal_log)
         orig_stderr = stderr
         rc = 1
 
-        open(log_path, "w") do io
+        tee_cmd = pipeline(`tee $(log_path)`, stdout=orig_stdout, stderr=orig_stderr)
+        open(tee_cmd, "w") do io
             rc = redirect_stdout(io) do
                 redirect_stderr(io) do
                     try
