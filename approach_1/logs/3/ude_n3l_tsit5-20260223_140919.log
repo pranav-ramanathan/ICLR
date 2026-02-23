@@ -1,0 +1,8 @@
+  model_path=/tmp/n3l_ude_smoke/3/model_ude_20260223_140759.jld2
+  ● ● · 
+  ● · ● 
+  · ● ● 
+  Saved: solutions/3/sol_ude_tsit5_20260223_140924_traj17.txt
+
+Reproduce exact run:
+julia --project=. --threads=auto ude_n3l_tsit5.jl 3 --mode solve --R 20 --T 0.5 --check-interval 0.1 --col-normalization mean-incidence --seed 123 --model-path /tmp/n3l_ude_smoke/3/model_ude_20260223_140759.jld2

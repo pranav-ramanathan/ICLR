@@ -1,0 +1,60 @@
+Precomputing lines for coefficient selection...
+Coefficient selection:
+  mode=normalized | base α=15.000, γ=5.000
+  normalized mode active with col-normalization=mean-incidence
+Precomputing lines...
+  Lines: 296 | Packed points: 1140 | Max len: 9 | Triple-equiv: 2712 | 0.000s
+  Collinearity normalization: mean-incidence | incidence mean=100.444, min=84.000, max=152.000
+============================================================
+N3L Gradient Flow — CPU Tsit5, Line-Based (v6)
+============================================================
+n=9, target=18 | α=15.000, β=1.0, γ=5.000
+Max: 500 traj, T=15.0s, 12 threads
+Seed: 9024344747089804520 | Coeff mode: normalized | Col norm: mean-incidence
+Lines: 296 (triple-equiv: 2712) | Progress: every 50
+============================================================
+[     7] ★ NEW BEST: 7 viols (traj 337)
+[     3] ★ NEW BEST: 6 viols (traj 169)
+[    16] ★ NEW BEST: 5 viols (traj 338)
+[    21] ★ NEW BEST: 2 viols (traj 461)
+[   100] best=2 | 58.5/s | eta=7s
+[    50] best=2 | 30.7/s | eta=15s
+[   150] best=2 | 84.3/s | eta=4s
+
+🎉 SOLUTION! traj=265, time=1.8s, tried=159
+------------------------------------------------------------
+✓✓✓ SUCCESS ✓✓✓
+Time: 1.83s | Tried: 184/500 (36.8%) | Rate: 100.8/s
+
+Violation distribution:
+   0 violations:     1 ( 0.54%) 
+   2 violations:     2 ( 1.09%) █
+   3 violations:     2 ( 1.09%) █
+   4 violations:     7 ( 3.80%) ██
+   5 violations:    13 ( 7.07%) ████
+   6 violations:    17 ( 9.24%) █████
+   7 violations:    25 (13.59%) ███████
+   8 violations:    27 (14.67%) ███████
+   9 violations:    17 ( 9.24%) █████
+  10 violations:    23 (12.50%) ██████
+  11 violations:    12 ( 6.52%) ███
+  12 violations:    10 ( 5.43%) ███
+  13 violations:    12 ( 6.52%) ███
+  14 violations:     8 ( 4.35%) ██
+  15 violations:     7 ( 3.80%) ██
+  18 violations:     1 ( 0.54%) 
+
+Solution:
+  · · · · · · ● ● · 
+  · · ● · ● · · · · 
+  ● · · · · · · · ● 
+  · · · ● · ● · · · 
+  ● · · · · · · · ● 
+  · · · ● · ● · · · 
+  · ● · · · · · ● · 
+  · · ● · · · ● · · 
+  · ● · · ● · · · · 
+  Saved: solutions/9/sol_v6_20260220_123102_traj265.txt
+
+Reproduce exact solution:
+julia --project=. --threads=auto main_v6.jl 9 --R 500 --T 15.0 --coeff-mode normalized --col-normalization mean-incidence --seed 9024344747089804520

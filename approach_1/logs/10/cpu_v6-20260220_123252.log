@@ -1,0 +1,74 @@
+Precomputing lines for coefficient selection...
+Coefficient selection:
+  mode=normalized | base α=16.667, γ=5.000
+  normalized mode active with col-normalization=mean-incidence
+Precomputing lines...
+  Lines: 406 | Packed points: 1612 | Max len: 10 | Triple-equiv: 4448 | 0.001s
+  Collinearity normalization: mean-incidence | incidence mean=133.440, min=112.000, max=176.000
+============================================================
+N3L Gradient Flow — CPU Tsit5, Line-Based (v6)
+============================================================
+n=10, target=20 | α=16.667, β=1.0, γ=5.000
+Max: 500 traj, T=15.0s, 12 threads
+Seed: 11145705876334639614 | Coeff mode: normalized | Col norm: mean-incidence
+Lines: 406 (triple-equiv: 4448) | Progress: every 50
+============================================================
+[     7] ★ NEW BEST: 13 viols (traj 85)
+[     0] ★ NEW BEST: 9 viols (traj 43)
+[     4] ★ NEW BEST: 5 viols (traj 1)
+[    50] best=5 | 33.7/s | eta=13s
+[    92] ★ NEW BEST: 4 viols (traj 134)
+[   100] best=4 | 62.4/s | eta=6s
+[   150] best=4 | 87.5/s | eta=4s
+[   200] best=4 | 109.7/s | eta=3s
+[   250] best=4 | 129.1/s | eta=2s
+[   265] ★ NEW BEST: 3 viols (traj 277)
+[   295] ★ NEW BEST: 2 viols (traj 279)
+[   300] best=2 | 146.2/s | eta=1s
+[   350] best=2 | 162.0/s | eta=1s
+[   400] best=2 | 175.7/s | eta=1s
+
+🎉 SOLUTION! traj=329, time=2.3s, tried=419
+------------------------------------------------------------
+✓✓✓ SUCCESS ✓✓✓
+Time: 2.36s | Tried: 442/500 (88.4%) | Rate: 187.0/s
+
+Violation distribution:
+   0 violations:     1 ( 0.23%) 
+   2 violations:     2 ( 0.45%) 
+   3 violations:     2 ( 0.45%) 
+   4 violations:     2 ( 0.45%) 
+   5 violations:    15 ( 3.39%) ██
+   6 violations:    19 ( 4.30%) ██
+   7 violations:    33 ( 7.47%) ████
+   8 violations:    48 (10.86%) █████
+   9 violations:    42 ( 9.50%) █████
+  10 violations:    49 (11.09%) ██████
+  11 violations:    56 (12.67%) ██████
+  12 violations:    43 ( 9.73%) █████
+  13 violations:    32 ( 7.24%) ████
+  14 violations:    26 ( 5.88%) ███
+  15 violations:    20 ( 4.52%) ██
+  16 violations:    17 ( 3.85%) ██
+  17 violations:    12 ( 2.71%) █
+  18 violations:    10 ( 2.26%) █
+  19 violations:     7 ( 1.58%) █
+  20 violations:     4 ( 0.90%) 
+  21 violations:     1 ( 0.23%) 
+  24 violations:     1 ( 0.23%) 
+
+Solution:
+  · · · · · · · ● · ● 
+  · ● · · ● · · · · · 
+  · · ● · ● · · · · · 
+  · · · · · · ● · ● · 
+  ● · · · · · · · · ● 
+  · · · ● · · ● · · · 
+  ● · ● · · · · · · · 
+  · · · · · ● · · ● · 
+  · · · · · ● · ● · · 
+  · ● · ● · · · · · · 
+  Saved: solutions/10/sol_v6_20260220_123256_traj329.txt
+
+Reproduce exact solution:
+julia --project=. --threads=auto main_v6.jl 10 --R 500 --T 15.0 --coeff-mode normalized --col-normalization mean-incidence --seed 11145705876334639614

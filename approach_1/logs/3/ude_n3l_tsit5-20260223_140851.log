@@ -1,0 +1,32 @@
+TypeError: in keyword argument model_path, expected Union{Nothing, String}, got a value of type SubString{String}
+Stacktrace:
+  [1] run_solve_mode(n::Int64, args::Dict{String, Any}, seed::UInt64, outdir::String, line_offsets::Vector{Int32}, line_points::Vector{Int32}, point_col_scale::Vector{Float64}, col_norm_mode_l::String, bounds_cli::ScheduleBounds; verbose::Bool)
+    @ Main ~/Developer/Work/Research/ICLR/approach_1/ude_n3l_tsit5.jl:1345
+  [2] main()
+    @ Main ~/Developer/Work/Research/ICLR/approach_1/ude_n3l_tsit5.jl:1517
+  [3] #41
+    @ ~/Developer/Work/Research/ICLR/approach_1/ude_n3l_tsit5.jl:1544 [inlined]
+  [4] (::var"#3#6"{var"#41#42"})()
+    @ Main ~/Developer/Work/Research/ICLR/approach_1/logging_utils.jl:34
+  [5] (::Base.RedirectStdStream)(thunk::var"#3#6"{var"#41#42"}, stream::Base.Process)
+    @ Base ./stream.jl:1429
+  [6] #2
+    @ ~/Developer/Work/Research/ICLR/approach_1/logging_utils.jl:32 [inlined]
+  [7] (::Base.RedirectStdStream)(thunk::var"#2#5"{Base.Process, var"#41#42"}, stream::Base.Process)
+    @ Base ./stream.jl:1429
+  [8] (::var"#1#4"{var"#41#42"})(io::Base.Process)
+    @ Main ~/Developer/Work/Research/ICLR/approach_1/logging_utils.jl:31
+  [9] open(f::var"#1#4"{var"#41#42"}, cmds::Base.CmdRedirect, args::String; kwargs::@Kwargs{})
+    @ Base ./process.jl:427
+ [10] open
+    @ ./process.jl:414 [inlined]
+ [11] run_with_terminal_log(f::var"#41#42", runner_name::String, args::Vector{String})
+    @ Main ~/Developer/Work/Research/ICLR/approach_1/logging_utils.jl:30
+ [12] top-level scope
+    @ ~/Developer/Work/Research/ICLR/approach_1/ude_n3l_tsit5.jl:1543
+ [13] include(mod::Module, _path::String)
+    @ Base ./Base.jl:495
+ [14] exec_options(opts::Base.JLOptions)
+    @ Base ./client.jl:323
+ [15] _start()
+    @ Base ./client.jl:557

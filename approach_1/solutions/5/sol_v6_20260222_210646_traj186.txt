@@ -1,0 +1,30 @@
+# n=5
+# target=10
+# trajectory_id=186
+# R=200
+# T=15.0
+# seed=1405770641742362428
+# α=8.333333333333334, β=1.0, γ=5.0
+# method=CPU Tsit5 Line-Based Gradient Flow (v6)
+# coeff_mode=normalized
+# col_normalization=mean-incidence
+# timestamp=2026-02-22T21:06:46Z
+#
+# Grid (0/1):
+0 0 1 1 0
+0 0 1 0 1
+1 0 0 0 1
+0 1 0 1 0
+1 1 0 0 0
+#
+# Coordinates (row, col):
+(1, 3)
+(1, 4)
+(2, 3)
+(2, 5)
+(3, 1)
+(3, 5)
+(4, 2)
+(4, 4)
+(5, 1)
+(5, 2)

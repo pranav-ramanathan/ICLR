@@ -1,16 +1,3 @@
-#!/usr/bin/env julia
-#=
-N3L Pure Gradient Flow — Metal GPU Accelerated (Line-Based RK4, v3)
-===================================================================
-This version uses line representation and adds collinearity normalization
-to stabilize alpha across larger board sizes.
-
-Key improvements vs `main_metal_v2.jl`:
-  - Per-point collinearity normalization (`mean-incidence`) in-kernel
-  - New coefficient mode `normalized` (default)
-  - Better portability of alpha as n grows
-=#
-
 using Metal
 using KernelAbstractions
 using Random
@@ -33,10 +20,6 @@ const MAX_STATE_DIM = 1024  # kernel private scratch limit (supports n <= 32)
     return z ⊻ (z >> 31)
 end
 
-# ============================================================================
-# Top-k Mask Helper (CPU)
-# ============================================================================
-
 function topk_mask(x::AbstractVector{<:Real}, k::Int)
     idx = partialsortperm(x, 1:k; rev=true)
     m = falses(length(x))
@@ -46,10 +29,6 @@ function topk_mask(x::AbstractVector{<:Real}, k::Int)
     return BitVector(m)
 end
 
-# ============================================================================
-# Configuration
-# ============================================================================
-
 Base.@kwdef struct Config
     n::Int
     R::Int = 5000
@@ -58,12 +37,6 @@ Base.@kwdef struct Config
     α::Float32 = 10.0f0
     β::Float32 = 1.0f0
     γ::Float32 = 4.5f0
-end
-
-@inline function legacy_coefficients(n::Int)
-    α = n <= 10 ? Float32(10.0 * (n / 6)) : 40.0f0
-    γ = n <= 10 ? 5.0f0 : 15.0f0
-    return α, γ
 end
 
 function density_coefficients(n::Int, line_offsets::Vector{Int32})
@@ -125,9 +98,7 @@ function choose_coefficients(
     avg_triples_per_var = NaN
     col_scale = NaN
 
-    if mode_l == "legacy"
-        base_α, base_γ = legacy_coefficients(n)
-    elseif mode_l == "density"
+    if mode_l == "density"
         base_α, base_γ, avg_triples_per_var, col_scale = density_coefficients(n, line_offsets)
     elseif mode_l == "normalized"
         base_α, base_γ = normalized_coefficients(n, normalization_mode)
@@ -205,10 +176,6 @@ function parse_cli_args(args)
 
     return parse_args(args, s)
 end
-
-# ============================================================================
-# Precompute Collinear Lines (Exact Triple-Equivalent Representation)
-# ============================================================================
 
 @inline function normalize_direction(dx::Int, dy::Int)
     g = gcd(abs(dx), abs(dy))
@@ -320,15 +287,6 @@ function compute_point_collinearity_scale(
 
     return scale, mean_inc, min_inc, max_inc, mode_l
 end
-
-# ============================================================================
-# GPU Kernel: RK4 Gradient Flow Integrator (Line-Based)
-# ============================================================================
-# Each thread integrates one trajectory from t=0 to t=T using fixed-step RK4.
-# The line-based gradient is exact for the triple energy:
-#   For point i on a line with point values {x_j}, contribution is
-#   sum_{j<k, j!=i, k!=i} x_j*x_k
-#   = ((S1-xi)^2 - (S2-xi^2)) / 2, where S1=sum(x), S2=sum(x^2) on that line.
 
 @kernel function rk4_gradient_flow_lines_kernel!(
     state,               # N × R matrix (Float32) — state, modified in-place
@@ -753,7 +711,7 @@ function save_solution(n, grid, traj_id, R, T, seed, α, γ, outdir; col_normali
     timestamp = Dates.format(now(), "yyyymmdd_HHMMSS")
     dir = "$(outdir)/$(n)"
     mkpath(dir)
-    filename = "$(dir)/sol_metal_v3_$(timestamp)_traj$(traj_id).txt"
+    filename = "$(dir)/sol_UDE_$(timestamp)_traj$(traj_id).txt"
 
     open(filename, "w") do io
         println(io, "# n=$(n)")
@@ -763,7 +721,7 @@ function save_solution(n, grid, traj_id, R, T, seed, α, γ, outdir; col_normali
         println(io, "# T=$(T)")
         println(io, "# seed=$(seed)")
         println(io, "# α=$(α), β=1.0, γ=$(γ)")
-        println(io, "# method=Metal GPU Line-Based Custom RK4 Kernel (v3)")
+        println(io, "# method=UDE Line-Based Custom RK4 Kernel")
         println(io, "# col_normalization=$(col_normalization)")
         println(io, "# timestamp=$(Dates.format(now(UTC), "yyyy-mm-ddTHH:MM:SSZ"))")
         println(io, "#")
@@ -921,7 +879,7 @@ function main()
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    exit(run_with_terminal_log("metal_v3", ARGS) do
+    exit(run_with_terminal_log("UDE", ARGS) do
         main()
     end)
 end

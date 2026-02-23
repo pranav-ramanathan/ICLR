@@ -1,0 +1,95 @@
+Precomputing lines for coefficient selection...
+Coefficient selection:
+  mode=normalized | base α=10.000, γ=4.500
+  normalized mode active with col-normalization=mean-incidence
+Precomputing lines...
+  Lines: 628 | Packed points: 2452 | Max len: 11 | Triple-equiv: 6992 | 0.001s
+  Collinearity normalization: mean-incidence | incidence mean=173.355, min=146.000, max=236.000
+============================================================
+N3L Gradient Flow — CPU Tsit5, Line-Based (v6)
+============================================================
+n=11, target=22 | α=10.000, β=1.0, γ=4.500
+Max: 2000 traj, T=15.0s, 12 threads
+Seed: 2336731186029130887 | Coeff mode: normalized | Col norm: mean-incidence
+Lines: 628 (triple-equiv: 6992) | Progress: every 50
+============================================================
+[     3] ★ NEW BEST: 9 viols (traj 168)
+[     0] ★ NEW BEST: 15 viols (traj 502)
+[     8] ★ NEW BEST: 7 viols (traj 335)
+[    67] ★ NEW BEST: 5 viols (traj 507)
+[    50] best=7 | 25.9/s | eta=1m 15s
+[   100] best=5 | 47.1/s | eta=40s
+[   114] ★ NEW BEST: 4 viols (traj 1346)
+[   150] best=4 | 65.3/s | eta=28s
+[   200] best=4 | 80.5/s | eta=22s
+[   250] best=4 | 94.0/s | eta=19s
+[   300] best=4 | 105.7/s | eta=16s
+[   350] best=4 | 115.4/s | eta=14s
+[   400] best=4 | 124.7/s | eta=13s
+[   450] best=4 | 132.3/s | eta=12s
+[   500] best=4 | 139.6/s | eta=11s
+[   550] best=4 | 146.3/s | eta=10s
+[   600] best=4 | 151.9/s | eta=9s
+[   650] best=4 | 157.2/s | eta=9s
+[   700] best=4 | 162.0/s | eta=8s
+[   750] best=4 | 166.7/s | eta=7s
+[   784] ★ NEW BEST: 3 viols (traj 400)
+[   800] best=3 | 170.8/s | eta=7s
+[   850] best=3 | 174.4/s | eta=7s
+[   900] best=3 | 178.2/s | eta=6s
+[   950] best=3 | 181.1/s | eta=6s
+[  1000] best=3 | 184.1/s | eta=5s
+[  1050] best=3 | 186.9/s | eta=5s
+[  1100] best=3 | 189.5/s | eta=5s
+[  1150] best=3 | 192.0/s | eta=4s
+[  1200] best=3 | 193.8/s | eta=4s
+[  1250] best=3 | 196.0/s | eta=4s
+[  1300] best=3 | 198.0/s | eta=4s
+[  1350] best=3 | 199.5/s | eta=3s
+[  1400] best=3 | 201.0/s | eta=3s
+[  1450] best=3 | 202.6/s | eta=3s
+[  1500] best=3 | 204.2/s | eta=2s
+[  1550] best=3 | 205.6/s | eta=2s
+[  1600] best=3 | 207.2/s | eta=2s
+[  1650] best=3 | 208.7/s | eta=2s
+[  1700] best=3 | 208.9/s | eta=1s
+[  1750] best=3 | 209.9/s | eta=1s
+[  1800] best=3 | 210.9/s | eta=1s
+[  1850] best=3 | 212.0/s | eta=1s
+[  1900] best=3 | 213.0/s | eta=0s
+[  1950] best=3 | 213.7/s | eta=0s
+------------------------------------------------------------
+✗✗✗ NO SOLUTION FOUND ✗✗✗
+Time: 9.40s | Tried: 2000 | Best: 3 viols | Rate: 212.7/s
+
+Violation distribution:
+   3 violations:     2 ( 0.10%) 
+   4 violations:    10 ( 0.50%) 
+   5 violations:    19 ( 0.95%) 
+   6 violations:    29 ( 1.45%) █
+   7 violations:    66 ( 3.30%) ██
+   8 violations:   103 ( 5.15%) ███
+   9 violations:   137 ( 6.85%) ███
+  10 violations:   169 ( 8.45%) ████
+  11 violations:   202 (10.10%) █████
+  12 violations:   192 ( 9.60%) █████
+  13 violations:   203 (10.15%) █████
+  14 violations:   180 ( 9.00%) ████
+  15 violations:   157 ( 7.85%) ████
+  16 violations:   115 ( 5.75%) ███
+  17 violations:   119 ( 5.95%) ███
+  18 violations:    85 ( 4.25%) ██
+  19 violations:    53 ( 2.65%) █
+  20 violations:    53 ( 2.65%) █
+  21 violations:    40 ( 2.00%) █
+  22 violations:    14 ( 0.70%) 
+  23 violations:    14 ( 0.70%) 
+  24 violations:    13 ( 0.65%) 
+  25 violations:     5 ( 0.25%) 
+  26 violations:     3 ( 0.15%) 
+  27 violations:     8 ( 0.40%) 
+  28 violations:     2 ( 0.10%) 
+  29 violations:     2 ( 0.10%) 
+  30 violations:     2 ( 0.10%) 
+  33 violations:     2 ( 0.10%) 
+  38 violations:     1 ( 0.05%) 

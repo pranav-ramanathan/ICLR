@@ -1,0 +1,48 @@
+Precomputing lines for coefficient selection...
+Coefficient selection:
+  mode=normalized | base α=10.000, γ=5.000
+  normalized mode active with col-normalization=mean-incidence
+Precomputing lines...
+  Lines: 58 | Packed points: 228 | Max len: 6 | Triple-equiv: 372 | 0.000s
+  Collinearity normalization: mean-incidence | incidence mean=31.000, min=26.000, max=40.000
+============================================================
+N3L Gradient Flow — CPU Tsit5, Line-Based (v6)
+============================================================
+n=6, target=12 | α=10.000, β=1.0, γ=5.000
+Max: 200 traj, T=15.0s, 12 threads
+Seed: 8781802704626834301 | Coeff mode: normalized | Col norm: mean-incidence
+Lines: 58 (triple-equiv: 372) | Progress: every 50
+============================================================
+[     5] ★ NEW BEST: 1 viols (traj 69)
+[     4] ★ NEW BEST: 3 viols (traj 86)
+
+🎉 SOLUTION! traj=89, time=1.6s, tried=28
+[    50] best=1 | 32.0/s | eta=5s
+------------------------------------------------------------
+✓✓✓ SUCCESS ✓✓✓
+Time: 1.64s | Tried: 77/200 (38.5%) | Rate: 47.0/s
+
+Violation distribution:
+   0 violations:     2 ( 2.60%) █
+   1 violations:     7 ( 9.09%) █████
+   2 violations:    13 (16.88%) ████████
+   3 violations:    20 (25.97%) █████████████
+   4 violations:    12 (15.58%) ████████
+   5 violations:     6 ( 7.79%) ████
+   6 violations:     8 (10.39%) █████
+   7 violations:     3 ( 3.90%) ██
+   8 violations:     4 ( 5.19%) ███
+   9 violations:     1 ( 1.30%) █
+  10 violations:     1 ( 1.30%) █
+
+Solution:
+  · ● · ● · · 
+  · ● · · ● · 
+  ● · · · ● · 
+  ● · · · · ● 
+  · · ● ● · · 
+  · · ● · · ● 
+  Saved: solutions/6/sol_v6_20260220_123010_traj89.txt
+
+Reproduce exact solution:
+julia --project=. --threads=auto main_v6.jl 6 --R 200 --T 15.0 --coeff-mode normalized --col-normalization mean-incidence --seed 8781802704626834301

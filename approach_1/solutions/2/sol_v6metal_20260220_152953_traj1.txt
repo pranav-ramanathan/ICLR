@@ -1,0 +1,23 @@
+# n=2
+# target=4
+# trajectory_id=1
+# R=200
+# T=15.0
+# seed=9047333484869415969
+# α=3.3333335, β=1.0, γ=5.0
+# method=Metal GPU Tsit5 Line-Based Gradient Flow (v6_metal)
+# precision=Float32
+# backend=EnsembleGPUArray (Metal)
+# coeff_mode=normalized
+# col_normalization=mean-incidence
+# timestamp=2026-02-20T15:29:53Z
+#
+# Grid (0/1):
+1 1
+1 1
+#
+# Coordinates (row, col):
+(1, 1)
+(1, 2)
+(2, 1)
+(2, 2)

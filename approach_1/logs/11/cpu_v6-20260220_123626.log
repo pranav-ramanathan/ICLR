@@ -1,0 +1,139 @@
+Precomputing lines for coefficient selection...
+Coefficient selection:
+  mode=normalized | base α=10.000, γ=4.500
+  normalized mode active with col-normalization=mean-incidence
+Precomputing lines...
+  Lines: 628 | Packed points: 2452 | Max len: 11 | Triple-equiv: 6992 | 0.001s
+  Collinearity normalization: mean-incidence | incidence mean=173.355, min=146.000, max=236.000
+============================================================
+N3L Gradient Flow — CPU Tsit5, Line-Based (v6)
+============================================================
+n=11, target=22 | α=10.000, β=1.0, γ=4.500
+Max: 4000 traj, T=15.0s, 12 threads
+Seed: 1315323556204784731 | Coeff mode: normalized | Col norm: mean-incidence
+Lines: 628 (triple-equiv: 6992) | Progress: every 50
+============================================================
+[     3] ★ NEW BEST: 11 viols (traj 2336)
+[    10] ★ NEW BEST: 9 viols (traj 1)
+[    20] ★ NEW BEST: 5 viols (traj 3336)
+[    50] best=5 | 28.4/s | eta=2m 19s
+[    74] ★ NEW BEST: 4 viols (traj 2675)
+[   100] best=4 | 50.5/s | eta=1m 17s
+[   150] best=4 | 69.2/s | eta=56s
+[   200] best=4 | 84.9/s | eta=45s
+[   250] best=4 | 98.1/s | eta=38s
+[   300] best=4 | 109.4/s | eta=34s
+[   350] best=4 | 119.8/s | eta=30s
+[   400] best=4 | 129.0/s | eta=28s
+[   450] best=4 | 136.9/s | eta=26s
+[   458] ★ NEW BEST: 3 viols (traj 3041)
+[   500] best=3 | 143.8/s | eta=24s
+[   527] ★ NEW BEST: 2 viols (traj 45)
+[   550] best=2 | 149.6/s | eta=23s
+[   600] best=2 | 155.0/s | eta=22s
+[   650] best=2 | 160.0/s | eta=21s
+[   700] best=2 | 164.3/s | eta=20s
+[   750] best=2 | 167.8/s | eta=19s
+[   800] best=2 | 170.7/s | eta=19s
+[   850] best=2 | 173.8/s | eta=18s
+[   900] best=2 | 177.3/s | eta=17s
+[   950] best=2 | 180.1/s | eta=17s
+[  1000] best=2 | 182.0/s | eta=16s
+[  1050] best=2 | 184.9/s | eta=16s
+[  1100] best=2 | 187.0/s | eta=16s
+[  1150] best=2 | 189.3/s | eta=15s
+[  1200] best=2 | 191.4/s | eta=15s
+[  1250] best=2 | 193.3/s | eta=14s
+[  1300] best=2 | 194.8/s | eta=14s
+[  1350] best=2 | 196.4/s | eta=13s
+[  1400] best=2 | 197.9/s | eta=13s
+[  1450] best=2 | 198.7/s | eta=13s
+[  1500] best=2 | 200.6/s | eta=12s
+[  1550] best=2 | 201.8/s | eta=12s
+[  1600] best=2 | 203.1/s | eta=12s
+[  1650] best=2 | 204.1/s | eta=12s
+[  1700] best=2 | 204.9/s | eta=11s
+[  1750] best=2 | 206.0/s | eta=11s
+[  1800] best=2 | 206.8/s | eta=11s
+[  1850] best=2 | 207.7/s | eta=10s
+[  1900] best=2 | 208.5/s | eta=10s
+[  1950] best=2 | 209.2/s | eta=10s
+[  2000] best=2 | 210.2/s | eta=10s
+[  2050] best=2 | 211.1/s | eta=9s
+[  2100] best=2 | 212.0/s | eta=9s
+[  2150] best=2 | 212.2/s | eta=9s
+[  2200] best=2 | 212.9/s | eta=8s
+[  2250] best=2 | 213.2/s | eta=8s
+[  2300] best=2 | 213.8/s | eta=8s
+[  2350] best=2 | 213.6/s | eta=8s
+[  2400] best=2 | 214.2/s | eta=7s
+[  2450] best=2 | 214.7/s | eta=7s
+[  2500] best=2 | 215.1/s | eta=7s
+[  2550] best=2 | 215.9/s | eta=7s
+[  2600] best=2 | 216.4/s | eta=6s
+[  2650] best=2 | 217.0/s | eta=6s
+[  2700] best=2 | 217.5/s | eta=6s
+[  2750] best=2 | 217.2/s | eta=6s
+[  2800] best=2 | 217.6/s | eta=6s
+[  2850] best=2 | 217.9/s | eta=5s
+[  2900] best=2 | 218.4/s | eta=5s
+[  2950] best=2 | 218.7/s | eta=5s
+[  3000] best=2 | 218.9/s | eta=5s
+[  3050] best=2 | 219.2/s | eta=4s
+[  3100] best=2 | 219.7/s | eta=4s
+[  3150] best=2 | 220.2/s | eta=4s
+[  3200] best=2 | 220.5/s | eta=4s
+[  3250] best=2 | 220.8/s | eta=3s
+[  3300] best=2 | 220.8/s | eta=3s
+[  3350] best=2 | 221.0/s | eta=3s
+[  3400] best=2 | 220.8/s | eta=3s
+[  3450] best=2 | 221.1/s | eta=2s
+[  3500] best=2 | 221.5/s | eta=2s
+[  3550] best=2 | 221.5/s | eta=2s
+[  3600] best=2 | 221.9/s | eta=2s
+[  3650] best=2 | 222.2/s | eta=2s
+[  3700] best=2 | 222.1/s | eta=1s
+[  3750] best=2 | 222.4/s | eta=1s
+[  3800] best=2 | 222.7/s | eta=1s
+[  3850] best=2 | 222.7/s | eta=1s
+[  3900] best=2 | 222.9/s | eta=0s
+[  3950] best=2 | 222.9/s | eta=0s
+------------------------------------------------------------
+✗✗✗ NO SOLUTION FOUND ✗✗✗
+Time: 18.18s | Tried: 4000 | Best: 2 viols | Rate: 220.0/s
+
+Violation distribution:
+   2 violations:     2 ( 0.05%) 
+   3 violations:     6 ( 0.15%) 
+   4 violations:    21 ( 0.53%) 
+   5 violations:    40 ( 1.00%) 
+   6 violations:    73 ( 1.82%) █
+   7 violations:   170 ( 4.25%) ██
+   8 violations:   209 ( 5.22%) ███
+   9 violations:   276 ( 6.90%) ███
+  10 violations:   332 ( 8.30%) ████
+  11 violations:   388 ( 9.70%) █████
+  12 violations:   400 (10.00%) █████
+  13 violations:   393 ( 9.82%) █████
+  14 violations:   338 ( 8.45%) ████
+  15 violations:   302 ( 7.55%) ████
+  16 violations:   247 ( 6.17%) ███
+  17 violations:   208 ( 5.20%) ███
+  18 violations:   156 ( 3.90%) ██
+  19 violations:   112 ( 2.80%) █
+  20 violations:   108 ( 2.70%) █
+  21 violations:    69 ( 1.73%) █
+  22 violations:    56 ( 1.40%) █
+  23 violations:    28 ( 0.70%) 
+  24 violations:    26 ( 0.65%) 
+  25 violations:    15 ( 0.38%) 
+  26 violations:     8 ( 0.20%) 
+  27 violations:     5 ( 0.12%) 
+  28 violations:     3 ( 0.07%) 
+  29 violations:     1 ( 0.03%) 
+  30 violations:     2 ( 0.05%) 
+  31 violations:     2 ( 0.05%) 
+  32 violations:     1 ( 0.03%) 
+  33 violations:     1 ( 0.03%) 
+  34 violations:     1 ( 0.03%) 
+  41 violations:     1 ( 0.03%) 

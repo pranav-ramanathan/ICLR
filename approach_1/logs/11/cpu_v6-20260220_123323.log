@@ -1,0 +1,62 @@
+Precomputing lines for coefficient selection...
+Coefficient selection:
+  mode=normalized | base α=10.000, γ=4.500
+  normalized mode active with col-normalization=mean-incidence
+Precomputing lines...
+  Lines: 628 | Packed points: 2452 | Max len: 11 | Triple-equiv: 6992 | 0.001s
+  Collinearity normalization: mean-incidence | incidence mean=173.355, min=146.000, max=236.000
+============================================================
+N3L Gradient Flow — CPU Tsit5, Line-Based (v6)
+============================================================
+n=11, target=22 | α=10.000, β=1.0, γ=4.500
+Max: 500 traj, T=15.0s, 12 threads
+Seed: 8765095396227012945 | Coeff mode: normalized | Col norm: mean-incidence
+Lines: 628 (triple-equiv: 6992) | Progress: every 50
+============================================================
+[     4] ★ NEW BEST: 18 viols (traj 295)
+[     1] ★ NEW BEST: 11 viols (traj 169)
+[     0] ★ NEW BEST: 8 viols (traj 253)
+[     9] ★ NEW BEST: 6 viols (traj 460)
+[    47] ★ NEW BEST: 5 viols (traj 214)
+[    50] best=5 | 27.7/s | eta=16s
+[   100] best=5 | 50.1/s | eta=8s
+[   150] best=5 | 68.9/s | eta=5s
+[   194] ★ NEW BEST: 4 viols (traj 477)
+[   200] best=4 | 84.9/s | eta=4s
+[   250] best=4 | 98.4/s | eta=3s
+[   300] best=4 | 110.2/s | eta=2s
+[   350] best=4 | 120.7/s | eta=1s
+[   400] best=4 | 129.9/s | eta=1s
+[   450] best=4 | 137.8/s | eta=0s
+------------------------------------------------------------
+✗✗✗ NO SOLUTION FOUND ✗✗✗
+Time: 3.47s | Tried: 500 | Best: 4 viols | Rate: 144.1/s
+
+Violation distribution:
+   4 violations:     2 ( 0.40%) 
+   5 violations:     6 ( 1.20%) █
+   6 violations:    19 ( 3.80%) ██
+   7 violations:    13 ( 2.60%) █
+   8 violations:    22 ( 4.40%) ██
+   9 violations:    32 ( 6.40%) ███
+  10 violations:    44 ( 8.80%) ████
+  11 violations:    57 (11.40%) ██████
+  12 violations:    55 (11.00%) ██████
+  13 violations:    48 ( 9.60%) █████
+  14 violations:    29 ( 5.80%) ███
+  15 violations:    39 ( 7.80%) ████
+  16 violations:    36 ( 7.20%) ████
+  17 violations:    26 ( 5.20%) ███
+  18 violations:    18 ( 3.60%) ██
+  19 violations:    12 ( 2.40%) █
+  20 violations:    19 ( 3.80%) ██
+  21 violations:     8 ( 1.60%) █
+  22 violations:     5 ( 1.00%) 
+  23 violations:     2 ( 0.40%) 
+  24 violations:     1 ( 0.20%) 
+  25 violations:     1 ( 0.20%) 
+  26 violations:     1 ( 0.20%) 
+  27 violations:     2 ( 0.40%) 
+  29 violations:     1 ( 0.20%) 
+  30 violations:     1 ( 0.20%) 
+  37 violations:     1 ( 0.20%) 

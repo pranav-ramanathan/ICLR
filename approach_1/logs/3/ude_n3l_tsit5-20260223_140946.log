@@ -1,0 +1,7 @@
+  ● ● · 
+  ● · ● 
+  · ● ● 
+  Saved: solutions/3/sol_ude_tsit5_20260223_140949_traj3.txt
+
+Reproduce exact run:
+julia --project=. --threads=auto ude_n3l_tsit5.jl 3 --mode solve --R 10 --T 0.5 --check-interval 0.1 --col-normalization mean-incidence --seed 123

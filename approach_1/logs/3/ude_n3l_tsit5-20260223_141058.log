@@ -1,0 +1,5 @@
+
+Training complete.
+Model: /tmp/n3l_ude_smoke2/3/model_ude_20260223_141121.jld2
+Solve with:
+julia --project=. --threads=auto ude_n3l_tsit5.jl 3 --mode solve --model-path /tmp/n3l_ude_smoke2/3/model_ude_20260223_141121.jld2 --R 200 --T 0.2 --check-interval 0.1 --seed 123

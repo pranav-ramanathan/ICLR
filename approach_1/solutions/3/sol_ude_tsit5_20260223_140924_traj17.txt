@@ -1,0 +1,26 @@
+# n=3
+# target=6
+# trajectory_id=17
+# R=20
+# T=0.5
+# seed=123
+# α=8.39730724143825, β=1.0, γ=8.428983074613695, η=2.291604436905528
+# method=CPU Tsit5 Line-Based UDE Gradient Flow
+# schedule_kind=neural
+# coeff_mode=normalized
+# col_normalization=mean-incidence
+# model_path=/tmp/n3l_ude_smoke/3/model_ude_20260223_140759.jld2
+# timestamp=2026-02-23T14:09:24Z
+#
+# Grid (0/1):
+1 1 0
+1 0 1
+0 1 1
+#
+# Coordinates (row, col):
+(1, 1)
+(1, 2)
+(2, 1)
+(2, 3)
+(3, 2)
+(3, 3)

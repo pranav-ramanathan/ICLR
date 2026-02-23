@@ -1,0 +1,43 @@
+Checking Metal GPU...
+  Device: Metal.MTL.MTLDeviceInstance (object of type AGXG14CDevice)
+Precomputing lines...
+  Lines: 5524 | Packed points: 21228 | Max len: 19 | Triple-equiv: 83640 | 0.012s
+  Collinearity normalization: mean-incidence | incidence mean=695.069, min=568.000, max=980.000
+Coefficient selection:
+  mode=normalized | base α=10.000, γ=4.000
+  normalized mode active with col-normalization=mean-incidence
+============================================================
+N3L Gradient Flow — Metal GPU (Line-Based RK4 Kernel v3)
+============================================================
+n=19, target=38 | α=10.000, β=1.0, γ=4.000
+Max: 5000 traj, T=10.000s (effective 10.000s), dt=0.0050, steps=2000
+Batch size: 1024 | Seed: 3163390343826943733
+------------------------------------------------------------
+Lines: 5524 | Packed points: 21228 | max line len: 19 | triple-equivalent terms: 83640
+Collinearity normalization: mean-incidence
+State dim: 361
+------------------------------------------------------------
+Warming up Metal GPU (compiling kernel)...
+  ✓ Metal warmup OK
+------------------------------------------------------------
+[Batch 1/5] Launching 1024 trajectories on GPU...
+  Best violations: 10 | 1024 tried | 11.2 traj/s
+[Batch 2/5] Launching 1024 trajectories on GPU...
+  Best violations: 10 | 2048 tried | 11.2 traj/s
+[Batch 3/5] Launching 1024 trajectories on GPU...
+  Best violations: 10 | 3072 tried | 11.2 traj/s
+[Batch 4/5] Launching 1024 trajectories on GPU...
+  Best violations: 10 | 4096 tried | 11.2 traj/s
+[Batch 5/5] Launching 904 trajectories on GPU...
+  Best violations: 10 | 5000 tried | 10.9 traj/s
+------------------------------------------------------------
+NO SOLUTION FOUND
+Time: 457.38s | Tried: 5000 | Best: 10 viols | Rate: 10.9/s
+
+Violation distribution:
+  10 violations:     1 ( 0.02%) 
+  14 violations:  4995 (99.90%) ########################################
+  15 violations:     1 ( 0.02%) 
+  30 violations:     1 ( 0.02%) 
+  38 violations:     1 ( 0.02%) 
+  46 violations:     1 ( 0.02%) 

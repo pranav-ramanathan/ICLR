@@ -1,0 +1,48 @@
+Precomputing lines for coefficient selection...
+Coefficient selection:
+  mode=normalized | base α=10.000, γ=4.500
+  normalized mode active with col-normalization=mean-incidence
+Precomputing lines...
+  Lines: 628 | Packed points: 2452 | Max len: 11 | Triple-equiv: 6992 | 0.001s
+  Collinearity normalization: mean-incidence | incidence mean=173.355, min=146.000, max=236.000
+============================================================
+N3L Gradient Flow — CPU Tsit5, Line-Based (v6)
+============================================================
+n=11, target=22 | α=10.000, β=1.0, γ=4.500
+Max: 200 traj, T=15.0s, 12 threads
+Seed: 9138291428209835846 | Coeff mode: normalized | Col norm: mean-incidence
+Lines: 628 (triple-equiv: 6992) | Progress: every 50
+============================================================
+[     3] ★ NEW BEST: 9 viols (traj 52)
+[    20] ★ NEW BEST: 7 viols (traj 19)
+[    46] ★ NEW BEST: 5 viols (traj 39)
+[    50] best=5 | 26.7/s | eta=6s
+[   100] best=5 | 48.3/s | eta=2s
+[   150] best=5 | 66.7/s | eta=1s
+------------------------------------------------------------
+✗✗✗ NO SOLUTION FOUND ✗✗✗
+Time: 2.47s | Tried: 200 | Best: 5 viols | Rate: 81.1/s
+
+Violation distribution:
+   5 violations:     3 ( 1.50%) █
+   6 violations:     2 ( 1.00%) 
+   7 violations:    10 ( 5.00%) ██
+   8 violations:    12 ( 6.00%) ███
+   9 violations:    18 ( 9.00%) ████
+  10 violations:    13 ( 6.50%) ███
+  11 violations:    16 ( 8.00%) ████
+  12 violations:    21 (10.50%) █████
+  13 violations:    17 ( 8.50%) ████
+  14 violations:    17 ( 8.50%) ████
+  15 violations:    15 ( 7.50%) ████
+  16 violations:    13 ( 6.50%) ███
+  17 violations:     9 ( 4.50%) ██
+  18 violations:    14 ( 7.00%) ████
+  19 violations:     6 ( 3.00%) ██
+  20 violations:     5 ( 2.50%) █
+  21 violations:     2 ( 1.00%) 
+  22 violations:     2 ( 1.00%) 
+  23 violations:     2 ( 1.00%) 
+  24 violations:     1 ( 0.50%) 
+  25 violations:     1 ( 0.50%) 
+  26 violations:     1 ( 0.50%) 

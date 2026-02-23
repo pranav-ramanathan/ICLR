@@ -1,0 +1,9 @@
+[train      1] loss=4.724648e-01 | eval best_viols=1 | avg|sum-k|=0.97826 | avg x(1-x)=-0.00254
+              α(0,0.5T,T)=[8.219, 8.861, 9.647] γ=[8.502, 6.921, 6.435] η=[2.243, 2.502, 2.714]
+[train      2] loss=4.654002e-01 | eval best_viols=1 | avg|sum-k|=0.96739 | avg x(1-x)=-0.00376
+              α(0,0.5T,T)=[8.397, 9.007, 9.743] γ=[8.429, 6.856, 6.395] η=[2.292, 2.549, 2.743]
+
+Training complete.
+Model: /tmp/n3l_ude_smoke/3/model_ude_20260223_140759.jld2
+Solve with:
+julia --project=. --threads=auto ude_n3l_tsit5.jl 3 --mode solve --model-path /tmp/n3l_ude_smoke/3/model_ude_20260223_140759.jld2 --R 200 --T 0.5 --check-interval 0.1 --seed 123

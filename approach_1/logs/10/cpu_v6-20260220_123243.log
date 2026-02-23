@@ -1,0 +1,52 @@
+Precomputing lines for coefficient selection...
+Coefficient selection:
+  mode=normalized | base α=16.667, γ=5.000
+  normalized mode active with col-normalization=mean-incidence
+Precomputing lines...
+  Lines: 406 | Packed points: 1612 | Max len: 10 | Triple-equiv: 4448 | 0.001s
+  Collinearity normalization: mean-incidence | incidence mean=133.440, min=112.000, max=176.000
+============================================================
+N3L Gradient Flow — CPU Tsit5, Line-Based (v6)
+============================================================
+n=10, target=20 | α=16.667, β=1.0, γ=5.000
+Max: 500 traj, T=15.0s, 12 threads
+Seed: 58001127165828228 | Coeff mode: normalized | Col norm: mean-incidence
+Lines: 406 (triple-equiv: 4448) | Progress: every 50
+============================================================
+[     3] ★ NEW BEST: 2 viols (traj 43)
+[    50] best=2 | 28.8/s | eta=16s
+[   100] best=2 | 54.1/s | eta=7s
+[   150] best=2 | 76.5/s | eta=5s
+[   200] best=2 | 96.1/s | eta=3s
+[   250] best=2 | 113.6/s | eta=2s
+[   300] best=2 | 129.7/s | eta=2s
+[   350] best=2 | 143.9/s | eta=1s
+[   400] best=2 | 157.0/s | eta=1s
+[   450] best=2 | 168.5/s | eta=0s
+------------------------------------------------------------
+✗✗✗ NO SOLUTION FOUND ✗✗✗
+Time: 2.88s | Tried: 500 | Best: 2 viols | Rate: 173.8/s
+
+Violation distribution:
+   2 violations:     4 ( 0.80%) 
+   3 violations:     2 ( 0.40%) 
+   4 violations:     7 ( 1.40%) █
+   5 violations:    16 ( 3.20%) ██
+   6 violations:    30 ( 6.00%) ███
+   7 violations:    42 ( 8.40%) ████
+   8 violations:    49 ( 9.80%) █████
+   9 violations:    57 (11.40%) ██████
+  10 violations:    56 (11.20%) ██████
+  11 violations:    40 ( 8.00%) ████
+  12 violations:    34 ( 6.80%) ███
+  13 violations:    40 ( 8.00%) ████
+  14 violations:    32 ( 6.40%) ███
+  15 violations:    23 ( 4.60%) ██
+  16 violations:    16 ( 3.20%) ██
+  17 violations:    16 ( 3.20%) ██
+  18 violations:    14 ( 2.80%) █
+  19 violations:    10 ( 2.00%) █
+  20 violations:     2 ( 0.40%) 
+  21 violations:     5 ( 1.00%) 
+  22 violations:     4 ( 0.80%) 
+  23 violations:     1 ( 0.20%) 

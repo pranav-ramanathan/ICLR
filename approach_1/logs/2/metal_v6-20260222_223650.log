@@ -1,0 +1,838 @@
+Precomputing lines for coefficient selection...
+Coefficient selection:
+  mode=normalized | base α=3.333, γ=5.000
+  normalized mode active with col-normalization=mean-incidence
+Precomputing lines...
+  Lines: 0 | Packed points: 0 | Max len: 0 | Triple-equiv: 0 | 0.000s
+  Collinearity normalization: mean-incidence | incidence mean=0.000, min=0.000, max=0.000
+Building incidence matrix... 0 × 4 (0.0 KB) in 0.000s
+  Metal GPU: Apple M2 Max ✓
+============================================================
+N3L Gradient Flow — Metal GPU, Matrix Tsit5 (v6)
+============================================================
+n=2, target=4 | α=3.333, β=1.0, γ=5.000 | Float32
+Max: 200 traj, T=15.0s, batch=6, threads=8
+Seed: 15344115232992000594 | Coeff mode: normalized | Col norm: mean-incidence
+Lines: 0 (triple-equiv: 0) | Incidence: 0×4 | GPU: Apple M2 Max
+============================================================
+InvalidIRError: compiling MethodInstance for DiffEqGPU.gpu_gpu_kernel(::KernelAbstractions.CompilerMetadata{KernelAbstractions.NDIteration.DynamicSize, KernelAbstractions.NDIteration.DynamicCheck, Nothing, CartesianIndices{1, Tuple{Base.OneTo{Int64}}}, KernelAbstractions.NDIteration.NDRange{1, KernelAbstractions.NDIteration.DynamicSize, KernelAbstractions.NDIteration.DynamicSize, CartesianIndices{1, Tuple{Base.OneTo{Int64}}}, CartesianIndices{1, Tuple{Base.OneTo{Int64}}}}}, ::var"#rhs!#9"{MtlDeviceMatrix{Float32, 1}, MtlDeviceMatrix{Float32, 1}, MtlDeviceVector{Float32, 1}, MtlDeviceVector{Float32, 1}, Float32, Float32, Float32}, ::MtlDeviceMatrix{Float32, 1}, ::MtlDeviceMatrix{Float32, 1}, ::MtlDeviceMatrix{SciMLBase.NullParameters, 1}, ::Float32) resulted in invalid LLVM IR
+Reason: unsupported call to an unknown function (call to gpu_gc_pool_alloc)
+Stacktrace:
+ [1] gemv!
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/blas.jl:667
+ [2] gemv!
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:415
+ [3] multiple call sites
+   @ unknown:0
+Reason: unsupported dynamic function invocation (call to unsafe_convert)
+Stacktrace:
+ [1] gemv!
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/blas.jl:667
+ [2] gemv!
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:415
+ [3] multiple call sites
+   @ unknown:0
+Reason: unsupported call to an unknown function (call to ijl_box_char)
+Stacktrace:
+ [1] gemv!
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:419
+ [2] multiple call sites
+   @ unknown:0
+Reason: unsupported call to an unknown function (call to gpu_gc_pool_alloc)
+Stacktrace:
+ [1] gemv!
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:419
+ [2] multiple call sites
+   @ unknown:0
+Reason: unsupported dynamic function invocation (call to hemv!)
+Stacktrace:
+ [1] gemv!
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:419
+ [2] multiple call sites
+   @ unknown:0
+Reason: unsupported call to an unknown function (call to gpu_gc_pool_alloc)
+Stacktrace:
+ [1] iterate
+   @ ./range.jl:901
+ [2] fill!
+   @ ./array.jl:396
+ [3] _rmul_or_fill!
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/generic.jl:103
+ [4] gemv!
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:409
+ [5] multiple call sites
+   @ unknown:0
+Reason: unsupported dynamic function invocation (call to _generic_matvecmul!)
+Stacktrace:
+ [1] gemv!
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:425
+ [2] multiple call sites
+   @ unknown:0
+Reason: unsupported call to an unknown function (call to ijl_box_char)
+Stacktrace:
+ [1] gemv!
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:427
+ [2] multiple call sites
+   @ unknown:0
+Reason: unsupported call to an unknown function (call to gpu_gc_pool_alloc)
+Stacktrace:
+ [1] gemv!
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:427
+ [2] multiple call sites
+   @ unknown:0
+Reason: unsupported dynamic function invocation (call to _generic_matvecmul!)
+Stacktrace:
+ [1] gemv!
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:427
+ [2] multiple call sites
+   @ unknown:0
+Reason: unsupported dynamic function invocation (call to _str_sizehint)
+Stacktrace:
+ [1] print_to_string
+   @ ./strings/io.jl:143
+ [2] multiple call sites
+   @ unknown:0
+Reason: unsupported dynamic function invocation (call to print)
+Stacktrace:
+ [1] print_to_string
+   @ ./strings/io.jl:148
+ [2] multiple call sites
+   @ unknown:0
+Reason: unsupported call through a literal pointer (call to ijl_array_grow_end)
+Stacktrace:
+ [1] _growend!
+   @ ./array.jl:1072
+ [2] resize!
+   @ ./array.jl:1315
+ [3] _unsafe_take!
+   @ ./iobuffer.jl:445
+ [4] print_to_string
+   @ ./strings/io.jl:150
+ [5] multiple call sites
+   @ unknown:0
+Reason: unsupported call through a literal pointer (call to ijl_array_del_end)
+Stacktrace:
+ [1] _deleteend!
+   @ ./array.jl:1081
+ [2] resize!
+   @ ./array.jl:1320
+ [3] _unsafe_take!
+   @ ./iobuffer.jl:445
+ [4] print_to_string
+   @ ./strings/io.jl:150
+ [5] multiple call sites
+   @ unknown:0
+Reason: unsupported call through a literal pointer (call to ijl_array_to_string)
+Stacktrace:
+ [1] String
+   @ ./strings/string.jl:67
+ [2] print_to_string
+   @ ./strings/io.jl:150
+ [3] multiple call sites
+   @ unknown:0
+Reason: unsupported call through a literal pointer (call to ijl_alloc_string)
+Stacktrace:
+ [1] _string_n
+   @ ./strings/string.jl:90
+ [2] StringVector
+   @ ./iobuffer.jl:32
+ [3] #IOBuffer#471
+   @ ./iobuffer.jl:115
+ [4] GenericIOBuffer
+   @ ./iobuffer.jl:106
+ [5] print_to_string
+   @ ./strings/io.jl:146
+ [6] multiple call sites
+   @ unknown:0
+Reason: unsupported call through a literal pointer (call to ijl_string_to_array)
+Stacktrace:
+ [1] unsafe_wrap
+   @ ./strings/string.jl:100
+ [2] StringVector
+   @ ./iobuffer.jl:32
+ [3] #IOBuffer#471
+   @ ./iobuffer.jl:115
+ [4] GenericIOBuffer
+   @ ./iobuffer.jl:106
+ [5] print_to_string
+   @ ./strings/io.jl:146
+ [6] multiple call sites
+   @ unknown:0
+Reason: unsupported call to an unknown function (call to gpu_gc_pool_alloc)
+Stacktrace:
+ [1] GenericIOBuffer
+   @ ./iobuffer.jl:21
+ [2] GenericIOBuffer
+   @ ./iobuffer.jl:28
+ [3] #IOBuffer#470
+   @ ./iobuffer.jl:99
+ [4] GenericIOBuffer
+   @ ./iobuffer.jl:84
+ [5] #IOBuffer#471
+   @ ./iobuffer.jl:115
+ [6] GenericIOBuffer
+   @ ./iobuffer.jl:106
+ [7] print_to_string
+   @ ./strings/io.jl:146
+ [8] multiple call sites
+   @ unknown:0
+Reason: unsupported call to an unknown function (call to ijl_box_char)
+Stacktrace:
+ [1] gemv!
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:419
+ [2] generic_matvecmul!
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:71
+ [3] mul!
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:66
+ [4] mul!
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:237
+ [5] *
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:53
+ [6] rhs!
+   @ ~/Developer/Work/Research/ICLR/approach_1/main_metal_v6.jl:371
+ [7] macro expansion
+   @ ~/.julia/packages/DiffEqGPU/JsBHq/src/ensemblegpuarray/kernels.jl:49
+ [8] gpu_gpu_kernel
+   @ ~/.julia/packages/KernelAbstractions/X5fk1/src/macros.jl:332
+ [9] gpu_gpu_kernel
+   @ ./none:0
+Reason: unsupported call to an unknown function (call to gpu_gc_pool_alloc)
+Stacktrace:
+ [1] gemv!
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:419
+ [2] generic_matvecmul!
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:71
+ [3] mul!
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:66
+ [4] mul!
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:237
+ [5] *
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:53
+ [6] rhs!
+   @ ~/Developer/Work/Research/ICLR/approach_1/main_metal_v6.jl:371
+ [7] macro expansion
+   @ ~/.julia/packages/DiffEqGPU/JsBHq/src/ensemblegpuarray/kernels.jl:49
+ [8] gpu_gpu_kernel
+   @ ~/.julia/packages/KernelAbstractions/X5fk1/src/macros.jl:332
+ [9] gpu_gpu_kernel
+   @ ./none:0
+Reason: unsupported dynamic function invocation (call to hemv!)
+Stacktrace:
+ [1] gemv!
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:419
+ [2] generic_matvecmul!
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:71
+ [3] mul!
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:66
+ [4] mul!
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:237
+ [5] *
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:53
+ [6] rhs!
+   @ ~/Developer/Work/Research/ICLR/approach_1/main_metal_v6.jl:371
+ [7] macro expansion
+   @ ~/.julia/packages/DiffEqGPU/JsBHq/src/ensemblegpuarray/kernels.jl:49
+ [8] gpu_gpu_kernel
+   @ ~/.julia/packages/KernelAbstractions/X5fk1/src/macros.jl:332
+ [9] gpu_gpu_kernel
+   @ ./none:0
+Reason: unsupported call to an unknown function (call to gpu_gc_pool_alloc)
+Stacktrace:
+  [1] iterate
+    @ ./range.jl:901
+  [2] fill!
+    @ ./array.jl:396
+  [3] _rmul_or_fill!
+    @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/generic.jl:103
+  [4] gemv!
+    @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:409
+  [5] generic_matvecmul!
+    @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:71
+  [6] mul!
+    @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:66
+  [7] mul!
+    @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:237
+  [8] *
+    @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:53
+  [9] rhs!
+    @ ~/Developer/Work/Research/ICLR/approach_1/main_metal_v6.jl:371
+ [10] macro expansion
+    @ ~/.julia/packages/DiffEqGPU/JsBHq/src/ensemblegpuarray/kernels.jl:49
+ [11] gpu_gpu_kernel
+    @ ~/.julia/packages/KernelAbstractions/X5fk1/src/macros.jl:332
+ [12] gpu_gpu_kernel
+    @ ./none:0
+Reason: unsupported call to an unknown function (call to gpu_gc_pool_alloc)
+Stacktrace:
+ [1] gemv!
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:425
+ [2] generic_matvecmul!
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:71
+ [3] mul!
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:66
+ [4] mul!
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:237
+ [5] *
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:53
+ [6] rhs!
+   @ ~/Developer/Work/Research/ICLR/approach_1/main_metal_v6.jl:371
+ [7] macro expansion
+   @ ~/.julia/packages/DiffEqGPU/JsBHq/src/ensemblegpuarray/kernels.jl:49
+ [8] gpu_gpu_kernel
+   @ ~/.julia/packages/KernelAbstractions/X5fk1/src/macros.jl:332
+ [9] gpu_gpu_kernel
+   @ ./none:0
+Reason: unsupported dynamic function invocation (call to _generic_matvecmul!)
+Stacktrace:
+ [1] gemv!
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:425
+ [2] generic_matvecmul!
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:71
+ [3] mul!
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:66
+ [4] mul!
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:237
+ [5] *
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:53
+ [6] rhs!
+   @ ~/Developer/Work/Research/ICLR/approach_1/main_metal_v6.jl:371
+ [7] macro expansion
+   @ ~/.julia/packages/DiffEqGPU/JsBHq/src/ensemblegpuarray/kernels.jl:49
+ [8] gpu_gpu_kernel
+   @ ~/.julia/packages/KernelAbstractions/X5fk1/src/macros.jl:332
+ [9] gpu_gpu_kernel
+   @ ./none:0
+Reason: unsupported call to an unknown function (call to ijl_box_char)
+Stacktrace:
+ [1] gemv!
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:427
+ [2] generic_matvecmul!
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:71
+ [3] mul!
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:66
+ [4] mul!
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:237
+ [5] *
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:53
+ [6] rhs!
+   @ ~/Developer/Work/Research/ICLR/approach_1/main_metal_v6.jl:371
+ [7] macro expansion
+   @ ~/.julia/packages/DiffEqGPU/JsBHq/src/ensemblegpuarray/kernels.jl:49
+ [8] gpu_gpu_kernel
+   @ ~/.julia/packages/KernelAbstractions/X5fk1/src/macros.jl:332
+ [9] gpu_gpu_kernel
+   @ ./none:0
+Reason: unsupported call to an unknown function (call to gpu_gc_pool_alloc)
+Stacktrace:
+ [1] gemv!
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:427
+ [2] generic_matvecmul!
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:71
+ [3] mul!
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:66
+ [4] mul!
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:237
+ [5] *
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:53
+ [6] rhs!
+   @ ~/Developer/Work/Research/ICLR/approach_1/main_metal_v6.jl:371
+ [7] macro expansion
+   @ ~/.julia/packages/DiffEqGPU/JsBHq/src/ensemblegpuarray/kernels.jl:49
+ [8] gpu_gpu_kernel
+   @ ~/.julia/packages/KernelAbstractions/X5fk1/src/macros.jl:332
+ [9] gpu_gpu_kernel
+   @ ./none:0
+Reason: unsupported dynamic function invocation (call to _generic_matvecmul!)
+Stacktrace:
+ [1] gemv!
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:427
+ [2] generic_matvecmul!
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:71
+ [3] mul!
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:66
+ [4] mul!
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:237
+ [5] *
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:53
+ [6] rhs!
+   @ ~/Developer/Work/Research/ICLR/approach_1/main_metal_v6.jl:371
+ [7] macro expansion
+   @ ~/.julia/packages/DiffEqGPU/JsBHq/src/ensemblegpuarray/kernels.jl:49
+ [8] gpu_gpu_kernel
+   @ ~/.julia/packages/KernelAbstractions/X5fk1/src/macros.jl:332
+ [9] gpu_gpu_kernel
+   @ ./none:0
+Reason: unsupported call through a literal pointer (call to ijl_alloc_array_1d)
+Stacktrace:
+  [1] Array
+    @ ./boot.jl:477
+  [2] Array
+    @ ./boot.jl:486
+  [3] Array
+    @ ./boot.jl:494
+  [4] similar
+    @ ./abstractarray.jl:876
+  [5] similar
+    @ ./abstractarray.jl:875
+  [6] similar
+    @ ./broadcast.jl:224
+  [7] similar
+    @ ./broadcast.jl:223
+  [8] copy
+    @ ./broadcast.jl:928
+  [9] materialize
+    @ ./broadcast.jl:903
+ [10] rhs!
+    @ ~/Developer/Work/Research/ICLR/approach_1/main_metal_v6.jl:368
+ [11] macro expansion
+    @ ~/.julia/packages/DiffEqGPU/JsBHq/src/ensemblegpuarray/kernels.jl:49
+ [12] gpu_gpu_kernel
+    @ ~/.julia/packages/KernelAbstractions/X5fk1/src/macros.jl:332
+ [13] gpu_gpu_kernel
+    @ ./none:0
+Reason: unsupported call to an unknown function (call to gpu_gc_pool_alloc)
+Stacktrace:
+  [1] string
+    @ ./strings/io.jl:189
+  [2] throwdm
+    @ ./broadcast.jl:1080
+  [3] copyto!
+    @ ./broadcast.jl:992
+  [4] copyto!
+    @ ./broadcast.jl:956
+  [5] copy
+    @ ./broadcast.jl:928
+  [6] materialize
+    @ ./broadcast.jl:903
+  [7] rhs!
+    @ ~/Developer/Work/Research/ICLR/approach_1/main_metal_v6.jl:368
+  [8] macro expansion
+    @ ~/.julia/packages/DiffEqGPU/JsBHq/src/ensemblegpuarray/kernels.jl:49
+  [9] gpu_gpu_kernel
+    @ ~/.julia/packages/KernelAbstractions/X5fk1/src/macros.jl:332
+ [10] gpu_gpu_kernel
+    @ ./none:0
+Reason: unsupported call through a literal pointer (call to ijl_alloc_array_1d)
+Stacktrace:
+  [1] Array
+    @ ./boot.jl:477
+  [2] Array
+    @ ./boot.jl:486
+  [3] similar
+    @ ./abstractarray.jl:841
+  [4] similar
+    @ ./subarray.jl:65
+  [5] similar
+    @ ./abstractarray.jl:832
+  [6] *
+    @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:53
+  [7] rhs!
+    @ ~/Developer/Work/Research/ICLR/approach_1/main_metal_v6.jl:371
+  [8] macro expansion
+    @ ~/.julia/packages/DiffEqGPU/JsBHq/src/ensemblegpuarray/kernels.jl:49
+  [9] gpu_gpu_kernel
+    @ ~/.julia/packages/KernelAbstractions/X5fk1/src/macros.jl:332
+ [10] gpu_gpu_kernel
+    @ ./none:0
+Reason: unsupported call through a literal pointer (call to ijl_alloc_array_1d)
+Stacktrace:
+ [1] Array
+   @ ./boot.jl:477
+ [2] Array
+   @ ./boot.jl:486
+ [3] similar
+   @ ./array.jl:420
+ [4] similar
+   @ ./abstractarray.jl:832
+ [5] *
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:53
+ [6] rhs!
+   @ ~/Developer/Work/Research/ICLR/approach_1/main_metal_v6.jl:372
+ [7] macro expansion
+   @ ~/.julia/packages/DiffEqGPU/JsBHq/src/ensemblegpuarray/kernels.jl:49
+ [8] gpu_gpu_kernel
+   @ ~/.julia/packages/KernelAbstractions/X5fk1/src/macros.jl:332
+ [9] gpu_gpu_kernel
+   @ ./none:0
+Reason: unsupported call through a literal pointer (call to ijl_alloc_array_1d)
+Stacktrace:
+  [1] Array
+    @ ./boot.jl:477
+  [2] Array
+    @ ./boot.jl:486
+  [3] Array
+    @ ./boot.jl:494
+  [4] similar
+    @ ./abstractarray.jl:876
+  [5] similar
+    @ ./abstractarray.jl:875
+  [6] similar
+    @ ./broadcast.jl:224
+  [7] similar
+    @ ./broadcast.jl:223
+  [8] copy
+    @ ./broadcast.jl:928
+  [9] materialize
+    @ ./broadcast.jl:903
+ [10] rhs!
+    @ ~/Developer/Work/Research/ICLR/approach_1/main_metal_v6.jl:375
+ [11] macro expansion
+    @ ~/.julia/packages/DiffEqGPU/JsBHq/src/ensemblegpuarray/kernels.jl:49
+ [12] gpu_gpu_kernel
+    @ ~/.julia/packages/KernelAbstractions/X5fk1/src/macros.jl:332
+ [13] gpu_gpu_kernel
+    @ ./none:0
+Reason: unsupported call through a literal pointer (call to ijl_array_copy)
+Stacktrace:
+  [1] copy
+    @ ./array.jl:411
+  [2] unaliascopy
+    @ ./abstractarray.jl:1496
+  [3] unalias
+    @ ./abstractarray.jl:1480
+  [4] broadcast_unalias
+    @ ./broadcast.jl:977
+  [5] preprocess
+    @ ./broadcast.jl:984
+  [6] preprocess_args
+    @ ./broadcast.jl:986
+  [7] preprocess
+    @ ./broadcast.jl:983
+  [8] preprocess_args
+    @ ./broadcast.jl:986
+  [9] preprocess
+    @ ./broadcast.jl:983
+ [10] preprocess_args
+    @ ./broadcast.jl:987
+ [11] preprocess_args
+    @ ./broadcast.jl:986
+ [12] preprocess
+    @ ./broadcast.jl:983
+ [13] copyto!
+    @ ./broadcast.jl:1000
+ [14] copyto!
+    @ ./broadcast.jl:956
+ [15] copy
+    @ ./broadcast.jl:928
+ [16] materialize
+    @ ./broadcast.jl:903
+ [17] rhs!
+    @ ~/Developer/Work/Research/ICLR/approach_1/main_metal_v6.jl:375
+ [18] macro expansion
+    @ ~/.julia/packages/DiffEqGPU/JsBHq/src/ensemblegpuarray/kernels.jl:49
+ [19] gpu_gpu_kernel
+    @ ~/.julia/packages/KernelAbstractions/X5fk1/src/macros.jl:332
+ [20] gpu_gpu_kernel
+    @ ./none:0
+Reason: unsupported call through a literal pointer (call to ijl_array_copy)
+Stacktrace:
+  [1] copy
+    @ ./array.jl:411
+  [2] unaliascopy
+    @ ./abstractarray.jl:1496
+  [3] unalias
+    @ ./abstractarray.jl:1480
+  [4] broadcast_unalias
+    @ ./broadcast.jl:977
+  [5] preprocess
+    @ ./broadcast.jl:984
+  [6] preprocess_args
+    @ ./broadcast.jl:987
+  [7] preprocess_args
+    @ ./broadcast.jl:986
+  [8] preprocess
+    @ ./broadcast.jl:983
+  [9] preprocess_args
+    @ ./broadcast.jl:986
+ [10] preprocess
+    @ ./broadcast.jl:983
+ [11] preprocess_args
+    @ ./broadcast.jl:987
+ [12] preprocess_args
+    @ ./broadcast.jl:986
+ [13] preprocess
+    @ ./broadcast.jl:983
+ [14] copyto!
+    @ ./broadcast.jl:1000
+ [15] copyto!
+    @ ./broadcast.jl:956
+ [16] copy
+    @ ./broadcast.jl:928
+ [17] materialize
+    @ ./broadcast.jl:903
+ [18] rhs!
+    @ ~/Developer/Work/Research/ICLR/approach_1/main_metal_v6.jl:375
+ [19] macro expansion
+    @ ~/.julia/packages/DiffEqGPU/JsBHq/src/ensemblegpuarray/kernels.jl:49
+ [20] gpu_gpu_kernel
+    @ ~/.julia/packages/KernelAbstractions/X5fk1/src/macros.jl:332
+ [21] gpu_gpu_kernel
+    @ ./none:0
+Reason: unsupported call through a literal pointer (call to ijl_array_copy)
+Stacktrace:
+  [1] copy
+    @ ./array.jl:411
+  [2] unaliascopy
+    @ ./abstractarray.jl:1496
+  [3] unalias
+    @ ./abstractarray.jl:1480
+  [4] broadcast_unalias
+    @ ./broadcast.jl:977
+  [5] preprocess
+    @ ./broadcast.jl:984
+  [6] preprocess_args
+    @ ./broadcast.jl:987
+  [7] preprocess_args
+    @ ./broadcast.jl:986
+  [8] preprocess
+    @ ./broadcast.jl:983
+  [9] preprocess_args
+    @ ./broadcast.jl:987
+ [10] preprocess_args
+    @ ./broadcast.jl:986
+ [11] preprocess
+    @ ./broadcast.jl:983
+ [12] copyto!
+    @ ./broadcast.jl:1000
+ [13] copyto!
+    @ ./broadcast.jl:956
+ [14] copy
+    @ ./broadcast.jl:928
+ [15] materialize
+    @ ./broadcast.jl:903
+ [16] rhs!
+    @ ~/Developer/Work/Research/ICLR/approach_1/main_metal_v6.jl:375
+ [17] macro expansion
+    @ ~/.julia/packages/DiffEqGPU/JsBHq/src/ensemblegpuarray/kernels.jl:49
+ [18] gpu_gpu_kernel
+    @ ~/.julia/packages/KernelAbstractions/X5fk1/src/macros.jl:332
+ [19] gpu_gpu_kernel
+    @ ./none:0
+Reason: unsupported call to an unknown function (call to gpu_gc_pool_alloc)
+Stacktrace:
+  [1] string
+    @ ./strings/io.jl:189
+  [2] throwdm
+    @ ./broadcast.jl:1080
+  [3] copyto!
+    @ ./broadcast.jl:992
+  [4] copyto!
+    @ ./broadcast.jl:956
+  [5] copy
+    @ ./broadcast.jl:928
+  [6] materialize
+    @ ./broadcast.jl:903
+  [7] rhs!
+    @ ~/Developer/Work/Research/ICLR/approach_1/main_metal_v6.jl:375
+  [8] macro expansion
+    @ ~/.julia/packages/DiffEqGPU/JsBHq/src/ensemblegpuarray/kernels.jl:49
+  [9] gpu_gpu_kernel
+    @ ~/.julia/packages/KernelAbstractions/X5fk1/src/macros.jl:332
+ [10] gpu_gpu_kernel
+    @ ./none:0
+Reason: unsupported call through a literal pointer (call to ijl_alloc_array_1d)
+Stacktrace:
+ [1] Array
+   @ ./boot.jl:477
+ [2] Array
+   @ ./boot.jl:486
+ [3] similar
+   @ ./array.jl:420
+ [4] similar
+   @ ./abstractarray.jl:832
+ [5] *
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:53
+ [6] rhs!
+   @ ~/Developer/Work/Research/ICLR/approach_1/main_metal_v6.jl:378
+ [7] macro expansion
+   @ ~/.julia/packages/DiffEqGPU/JsBHq/src/ensemblegpuarray/kernels.jl:49
+ [8] gpu_gpu_kernel
+   @ ~/.julia/packages/KernelAbstractions/X5fk1/src/macros.jl:332
+ [9] gpu_gpu_kernel
+   @ ./none:0
+Reason: unsupported call through a literal pointer (call to ijl_alloc_array_1d)
+Stacktrace:
+ [1] Array
+   @ ./boot.jl:477
+ [2] Array
+   @ ./boot.jl:486
+ [3] similar
+   @ ./array.jl:420
+ [4] similar
+   @ ./abstractarray.jl:832
+ [5] *
+   @ ~/.julia/juliaup/julia-1.10.10+0.aarch64.apple.darwin14/share/julia/stdlib/v1.10/LinearAlgebra/src/matmul.jl:53
+ [6] rhs!
+   @ ~/Developer/Work/Research/ICLR/approach_1/main_metal_v6.jl:379
+ [7] macro expansion
+   @ ~/.julia/packages/DiffEqGPU/JsBHq/src/ensemblegpuarray/kernels.jl:49
+ [8] gpu_gpu_kernel
+   @ ~/.julia/packages/KernelAbstractions/X5fk1/src/macros.jl:332
+ [9] gpu_gpu_kernel
+   @ ./none:0
+Reason: unsupported call to an unknown function (call to gpu_gc_pool_alloc)
+Stacktrace:
+  [1] string
+    @ ./strings/io.jl:189
+  [2] throwdm
+    @ ./broadcast.jl:1080
+  [3] copyto!
+    @ ./broadcast.jl:992
+  [4] copyto!
+    @ ./broadcast.jl:956
+  [5] materialize!
+    @ ./broadcast.jl:914
+  [6] materialize!
+    @ ./broadcast.jl:911
+  [7] rhs!
+    @ ~/Developer/Work/Research/ICLR/approach_1/main_metal_v6.jl:389
+  [8] macro expansion
+    @ ~/.julia/packages/DiffEqGPU/JsBHq/src/ensemblegpuarray/kernels.jl:49
+  [9] gpu_gpu_kernel
+    @ ~/.julia/packages/KernelAbstractions/X5fk1/src/macros.jl:332
+ [10] gpu_gpu_kernel
+    @ ./none:0
+Reason: unsupported call to an unknown function (call to gpu_malloc)
+Stacktrace:
+ [1] malloc
+   @ ~/.julia/packages/GPUCompiler/OCZFZ/src/runtime.jl:85
+ [2] macro expansion
+   @ ~/.julia/packages/GPUCompiler/OCZFZ/src/runtime.jl:180
+ [3] macro expansion
+   @ ./none:0
+ [4] box
+   @ ./none:0
+ [5] box_int64
+   @ ~/.julia/packages/GPUCompiler/OCZFZ/src/runtime.jl:209
+ [6] multiple call sites
+   @ unknown:0
+Reason: unsupported call to an unknown function (call to gpu_malloc)
+Stacktrace:
+ [1] malloc
+   @ ~/.julia/packages/GPUCompiler/OCZFZ/src/runtime.jl:85
+ [2] macro expansion
+   @ ~/.julia/packages/GPUCompiler/OCZFZ/src/runtime.jl:180
+ [3] macro expansion
+   @ ./none:0
+ [4] box
+   @ ./none:0
+ [5] box_float32
+   @ ~/.julia/packages/GPUCompiler/OCZFZ/src/runtime.jl:209
+ [6] multiple call sites
+   @ unknown:0
+Hint: catch this exception as `err` and call `code_typed(err; interactive = true)` to introspect the erroneous code with Cthulhu.jl
+Stacktrace:
+  [1] check_ir(job::GPUCompiler.CompilerJob{GPUCompiler.MetalCompilerTarget, Metal.MetalCompilerParams}, args::LLVM.Module)
+    @ GPUCompiler ~/.julia/packages/GPUCompiler/OCZFZ/src/validation.jl:167
+  [2] macro expansion
+    @ ~/.julia/packages/GPUCompiler/OCZFZ/src/driver.jl:420 [inlined]
+  [3] emit_llvm(job::GPUCompiler.CompilerJob; kwargs::@Kwargs{})
+    @ GPUCompiler ~/.julia/packages/GPUCompiler/OCZFZ/src/utils.jl:116
+  [4] emit_llvm
+    @ ~/.julia/packages/GPUCompiler/OCZFZ/src/utils.jl:114 [inlined]
+  [5] compile_unhooked(output::Symbol, job::GPUCompiler.CompilerJob; kwargs::@Kwargs{})
+    @ GPUCompiler ~/.julia/packages/GPUCompiler/OCZFZ/src/driver.jl:95
+  [6] compile_unhooked
+    @ ~/.julia/packages/GPUCompiler/OCZFZ/src/driver.jl:80 [inlined]
+  [7] compile(target::Symbol, job::GPUCompiler.CompilerJob; kwargs::@Kwargs{})
+    @ GPUCompiler ~/.julia/packages/GPUCompiler/OCZFZ/src/driver.jl:67
+  [8] compile
+    @ ~/.julia/packages/GPUCompiler/OCZFZ/src/driver.jl:55 [inlined]
+  [9] (::Metal.var"#157#165"{GPUCompiler.CompilerJob{GPUCompiler.MetalCompilerTarget, Metal.MetalCompilerParams}})(ctx::LLVM.Context)
+    @ Metal ~/.julia/packages/Metal/EFzAO/src/compiler/compilation.jl:173
+ [10] JuliaContext(f::Metal.var"#157#165"{GPUCompiler.CompilerJob{GPUCompiler.MetalCompilerTarget, Metal.MetalCompilerParams}}; kwargs::@Kwargs{})
+    @ GPUCompiler ~/.julia/packages/GPUCompiler/OCZFZ/src/driver.jl:34
+ [11] JuliaContext(f::Function)
+    @ GPUCompiler ~/.julia/packages/GPUCompiler/OCZFZ/src/driver.jl:25
+ [12] macro expansion
+    @ ~/.julia/packages/Metal/EFzAO/src/compiler/compilation.jl:172 [inlined]
+ [13] macro expansion
+    @ ~/.julia/packages/ObjectiveC/UNTzb/src/os.jl:264 [inlined]
+ [14] compile(job::GPUCompiler.CompilerJob)
+    @ Metal ~/.julia/packages/Metal/EFzAO/src/compiler/compilation.jl:170
+ [15] actual_compilation(cache::Dict{Any, Any}, src::Core.MethodInstance, world::UInt64, cfg::GPUCompiler.CompilerConfig{GPUCompiler.MetalCompilerTarget, Metal.MetalCompilerParams}, compiler::typeof(Metal.compile), linker::typeof(Metal.link))
+    @ GPUCompiler ~/.julia/packages/GPUCompiler/OCZFZ/src/execution.jl:245
+ [16] cached_compilation(cache::Dict{Any, Any}, src::Core.MethodInstance, cfg::GPUCompiler.CompilerConfig{GPUCompiler.MetalCompilerTarget, Metal.MetalCompilerParams}, compiler::Function, linker::Function)
+    @ GPUCompiler ~/.julia/packages/GPUCompiler/OCZFZ/src/execution.jl:159
+ [17] macro expansion
+    @ ~/.julia/packages/Metal/EFzAO/src/compiler/execution.jl:189 [inlined]
+ [18] macro expansion
+    @ ./lock.jl:267 [inlined]
+ [19] mtlfunction(f::typeof(DiffEqGPU.gpu_gpu_kernel), tt::Type{Tuple{KernelAbstractions.CompilerMetadata{KernelAbstractions.NDIteration.DynamicSize, KernelAbstractions.NDIteration.DynamicCheck, Nothing, CartesianIndices{1, Tuple{Base.OneTo{Int64}}}, KernelAbstractions.NDIteration.NDRange{1, KernelAbstractions.NDIteration.DynamicSize, KernelAbstractions.NDIteration.DynamicSize, CartesianIndices{1, Tuple{Base.OneTo{Int64}}}, CartesianIndices{1, Tuple{Base.OneTo{Int64}}}}}, var"#rhs!#9"{MtlDeviceMatrix{Float32, 1}, MtlDeviceMatrix{Float32, 1}, MtlDeviceVector{Float32, 1}, MtlDeviceVector{Float32, 1}, Float32, Float32, Float32}, MtlDeviceMatrix{Float32, 1}, MtlDeviceMatrix{Float32, 1}, MtlDeviceMatrix{SciMLBase.NullParameters, 1}, Float32}}; name::Nothing, kwargs::@Kwargs{})
+    @ Metal ~/.julia/packages/Metal/EFzAO/src/compiler/execution.jl:184
+ [20] mtlfunction(f::typeof(DiffEqGPU.gpu_gpu_kernel), tt::Type{Tuple{KernelAbstractions.CompilerMetadata{KernelAbstractions.NDIteration.DynamicSize, KernelAbstractions.NDIteration.DynamicCheck, Nothing, CartesianIndices{1, Tuple{Base.OneTo{Int64}}}, KernelAbstractions.NDIteration.NDRange{1, KernelAbstractions.NDIteration.DynamicSize, KernelAbstractions.NDIteration.DynamicSize, CartesianIndices{1, Tuple{Base.OneTo{Int64}}}, CartesianIndices{1, Tuple{Base.OneTo{Int64}}}}}, var"#rhs!#9"{MtlDeviceMatrix{Float32, 1}, MtlDeviceMatrix{Float32, 1}, MtlDeviceVector{Float32, 1}, MtlDeviceVector{Float32, 1}, Float32, Float32, Float32}, MtlDeviceMatrix{Float32, 1}, MtlDeviceMatrix{Float32, 1}, MtlDeviceMatrix{SciMLBase.NullParameters, 1}, Float32}})
+    @ Metal ~/.julia/packages/Metal/EFzAO/src/compiler/execution.jl:182
+ [21] macro expansion
+    @ ~/.julia/packages/Metal/EFzAO/src/compiler/execution.jl:85 [inlined]
+ [22] (::KernelAbstractions.Kernel{MetalBackend, KernelAbstractions.NDIteration.DynamicSize, KernelAbstractions.NDIteration.DynamicSize, typeof(DiffEqGPU.gpu_gpu_kernel)})(::Function, ::Vararg{Any}; ndrange::Int64, workgroupsize::Int64)
+    @ Metal.MetalKernels ~/.julia/packages/Metal/EFzAO/src/MetalKernels.jl:115
+ [23] Kernel
+    @ ~/.julia/packages/Metal/EFzAO/src/MetalKernels.jl:111 [inlined]
+ [24] #12
+    @ ~/.julia/packages/DiffEqGPU/JsBHq/src/ensemblegpuarray/problem_generation.jl:10 [inlined]
+ [25] ODEFunction
+    @ ~/.julia/packages/SciMLBase/emsSz/src/scimlfunctions.jl:2643 [inlined]
+ [26] initialize!(integrator::OrdinaryDiffEqCore.ODEIntegrator{Tsit5{typeof(OrdinaryDiffEqCore.trivial_limiter!), typeof(OrdinaryDiffEqCore.trivial_limiter!), Static.False}, true, MtlMatrix{Float32, Metal.PrivateStorage}, Nothing, Float32, MtlMatrix{SciMLBase.NullParameters, Metal.PrivateStorage}, Float32, Float32, Float32, Float32, Vector{MtlMatrix{Float32, Metal.PrivateStorage}}, ODESolution{Float32, 3, Vector{MtlMatrix{Float32, Metal.PrivateStorage}}, Nothing, Nothing, Vector{Float32}, Vector{Vector{MtlMatrix{Float32, Metal.PrivateStorage}}}, Nothing, ODEProblem{MtlMatrix{Float32, Metal.PrivateStorage}, Tuple{Float32, Float32}, true, MtlMatrix{SciMLBase.NullParameters, Metal.PrivateStorage}, ODEFunction{true, SciMLBase.FullSpecialize, DiffEqGPU.var"#12#16"{var"#rhs!#9"{MtlMatrix{Float32, Metal.PrivateStorage}, MtlMatrix{Float32, Metal.PrivateStorage}, MtlVector{Float32, Metal.PrivateStorage}, MtlVector{Float32, Metal.PrivateStorage}, Float32, Float32, Float32}, typeof(DiffEqGPU.gpu_kernel)}, LinearAlgebra.UniformScaling{Bool}, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, typeof(SciMLBase.DEFAULT_OBSERVED), Nothing, Nothing, Nothing, Nothing}, @Kwargs{}, SciMLBase.StandardODEProblem}, Tsit5{typeof(OrdinaryDiffEqCore.trivial_limiter!), typeof(OrdinaryDiffEqCore.trivial_limiter!), Static.False}, OrdinaryDiffEqCore.InterpolationData{ODEFunction{true, SciMLBase.FullSpecialize, DiffEqGPU.var"#12#16"{var"#rhs!#9"{MtlMatrix{Float32, Metal.PrivateStorage}, MtlMatrix{Float32, Metal.PrivateStorage}, MtlVector{Float32, Metal.PrivateStorage}, MtlVector{Float32, Metal.PrivateStorage}, Float32, Float32, Float32}, typeof(DiffEqGPU.gpu_kernel)}, LinearAlgebra.UniformScaling{Bool}, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, typeof(SciMLBase.DEFAULT_OBSERVED), Nothing, Nothing, Nothing, Nothing}, Vector{MtlMatrix{Float32, Metal.PrivateStorage}}, Vector{Float32}, Vector{Vector{MtlMatrix{Float32, Metal.PrivateStorage}}}, Nothing, OrdinaryDiffEqTsit5.Tsit5Cache{MtlMatrix{Float32, Metal.PrivateStorage}, MtlMatrix{Float32, Metal.PrivateStorage}, MtlMatrix{Float32, Metal.PrivateStorage}, typeof(OrdinaryDiffEqCore.trivial_limiter!), typeof(OrdinaryDiffEqCore.trivial_limiter!), Static.False}, Nothing}, SciMLBase.DEStats, Nothing, Nothing, Nothing, Nothing}, ODEFunction{true, SciMLBase.FullSpecialize, DiffEqGPU.var"#12#16"{var"#rhs!#9"{MtlMatrix{Float32, Metal.PrivateStorage}, MtlMatrix{Float32, Metal.PrivateStorage}, MtlVector{Float32, Metal.PrivateStorage}, MtlVector{Float32, Metal.PrivateStorage}, Float32, Float32, Float32}, typeof(DiffEqGPU.gpu_kernel)}, LinearAlgebra.UniformScaling{Bool}, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, typeof(SciMLBase.DEFAULT_OBSERVED), Nothing, Nothing, Nothing, Nothing}, OrdinaryDiffEqTsit5.Tsit5Cache{MtlMatrix{Float32, Metal.PrivateStorage}, MtlMatrix{Float32, Metal.PrivateStorage}, MtlMatrix{Float32, Metal.PrivateStorage}, typeof(OrdinaryDiffEqCore.trivial_limiter!), typeof(OrdinaryDiffEqCore.trivial_limiter!), Static.False}, OrdinaryDiffEqCore.DEOptions{Float32, Float32, Float32, Float32, OrdinaryDiffEqCore.PIControllerCache{Float32, MtlMatrix{Float32, Metal.PrivateStorage}}, typeof(DiffEqGPU.diffeqgpunorm), typeof(LinearAlgebra.opnorm), Nothing, CallbackSet{Tuple{}, Tuple{}}, typeof(DiffEqBase.ODE_DEFAULT_ISOUTOFDOMAIN), typeof(DiffEqBase.ODE_DEFAULT_PROG_MESSAGE), DiffEqGPU.var"#100#106", DataStructures.BinaryHeap{Float32, DataStructures.FasterForward}, DataStructures.BinaryHeap{Float32, DataStructures.FasterForward}, Nothing, Nothing, Int64, Tuple{}, Tuple{}, Tuple{}, OrdinaryDiffEqCore.DEVerbosity{SciMLLogging.Minimal, SciMLLogging.Minimal, SciMLLogging.WarnLevel, SciMLLogging.WarnLevel, SciMLLogging.WarnLevel, SciMLLogging.WarnLevel, SciMLLogging.WarnLevel, SciMLLogging.WarnLevel, SciMLLogging.Silent, SciMLLogging.Silent, SciMLLogging.Silent, SciMLLogging.Silent, SciMLLogging.Silent, SciMLLogging.Silent, SciMLLogging.WarnLevel, SciMLLogging.Silent, SciMLLogging.Silent, SciMLLogging.Silent, SciMLLogging.WarnLevel, SciMLLogging.Silent, SciMLLogging.WarnLevel, SciMLLogging.Silent, SciMLLogging.Silent, SciMLLogging.Silent, SciMLLogging.Silent, SciMLLogging.Silent, SciMLLogging.Silent, SciMLLogging.Silent, SciMLLogging.Silent, SciMLLogging.Silent, SciMLLogging.Silent, SciMLLogging.Silent}}, MtlMatrix{Float32, Metal.PrivateStorage}, Float32, Nothing, DiffEqBase.DefaultInit, Nothing, OrdinaryDiffEqCore.PIControllerCache{Float32, MtlMatrix{Float32, Metal.PrivateStorage}}}, cache::OrdinaryDiffEqTsit5.Tsit5Cache{MtlMatrix{Float32, Metal.PrivateStorage}, MtlMatrix{Float32, Metal.PrivateStorage}, MtlMatrix{Float32, Metal.PrivateStorage}, typeof(OrdinaryDiffEqCore.trivial_limiter!), typeof(OrdinaryDiffEqCore.trivial_limiter!), Static.False})
+    @ OrdinaryDiffEqTsit5 ~/.julia/packages/OrdinaryDiffEqTsit5/7fE34/src/tsit_perform_step.jl:197
+ [27] __init(prob::ODEProblem{MtlMatrix{Float32, Metal.PrivateStorage}, Tuple{Float32, Float32}, true, MtlMatrix{SciMLBase.NullParameters, Metal.PrivateStorage}, ODEFunction{true, SciMLBase.FullSpecialize, DiffEqGPU.var"#12#16"{var"#rhs!#9"{MtlMatrix{Float32, Metal.PrivateStorage}, MtlMatrix{Float32, Metal.PrivateStorage}, MtlVector{Float32, Metal.PrivateStorage}, MtlVector{Float32, Metal.PrivateStorage}, Float32, Float32, Float32}, typeof(DiffEqGPU.gpu_kernel)}, LinearAlgebra.UniformScaling{Bool}, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, typeof(SciMLBase.DEFAULT_OBSERVED), Nothing, Nothing, Nothing, Nothing}, @Kwargs{}, SciMLBase.StandardODEProblem}, alg::Tsit5{typeof(OrdinaryDiffEqCore.trivial_limiter!), typeof(OrdinaryDiffEqCore.trivial_limiter!), Static.False}, timeseries_init::Tuple{}, ts_init::Tuple{}, ks_init::Tuple{}; saveat::Tuple{}, tstops::Tuple{}, d_discontinuities::Tuple{}, save_idxs::Nothing, save_everystep::Bool, save_on::Bool, save_discretes::Bool, save_start::Bool, save_end::Nothing, callback::Nothing, dense::Bool, calck::Bool, dt::Nothing, dtmin::Float32, dtmax::Float32, force_dtmin::Bool, adaptive::Bool, abstol::Float32, reltol::Float32, gamma::Nothing, qmin::Nothing, qmax::Nothing, qsteady_min::Nothing, qsteady_max::Nothing, beta1::Nothing, beta2::Nothing, qoldinit::Nothing, fullnormalize::Bool, failfactor::Int64, maxiters::Int64, internalnorm::typeof(DiffEqGPU.diffeqgpunorm), internalopnorm::typeof(LinearAlgebra.opnorm), isoutofdomain::typeof(DiffEqBase.ODE_DEFAULT_ISOUTOFDOMAIN), unstable_check::DiffEqGPU.var"#100#106", verbose::SciMLLogging.Standard, controller::OrdinaryDiffEqCore.NewPIController{Float32}, timeseries_errors::Bool, dense_errors::Bool, advance_to_tstop::Bool, stop_at_next_tstop::Bool, initialize_save::Bool, progress::Bool, progress_steps::Int64, progress_name::String, progress_message::typeof(DiffEqBase.ODE_DEFAULT_PROG_MESSAGE), progress_id::Symbol, userdata::Nothing, allow_extrapolation::Bool, initialize_integrator::Bool, alias::ODEAliasSpecifier, initializealg::DiffEqBase.DefaultInit, kwargs::@Kwargs{})
+    @ OrdinaryDiffEqCore ~/.julia/packages/OrdinaryDiffEqCore/mhzxi/src/solve.jl:713
+ [28] __init (repeats 2 times)
+    @ ~/.julia/packages/OrdinaryDiffEqCore/mhzxi/src/solve.jl:19 [inlined]
+ [29] __solve(::ODEProblem{MtlMatrix{Float32, Metal.PrivateStorage}, Tuple{Float32, Float32}, true, MtlMatrix{SciMLBase.NullParameters, Metal.PrivateStorage}, ODEFunction{true, SciMLBase.FullSpecialize, DiffEqGPU.var"#12#16"{var"#rhs!#9"{MtlMatrix{Float32, Metal.PrivateStorage}, MtlMatrix{Float32, Metal.PrivateStorage}, MtlVector{Float32, Metal.PrivateStorage}, MtlVector{Float32, Metal.PrivateStorage}, Float32, Float32, Float32}, typeof(DiffEqGPU.gpu_kernel)}, LinearAlgebra.UniformScaling{Bool}, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, typeof(SciMLBase.DEFAULT_OBSERVED), Nothing, Nothing, Nothing, Nothing}, @Kwargs{}, SciMLBase.StandardODEProblem}, ::Tsit5{typeof(OrdinaryDiffEqCore.trivial_limiter!), typeof(OrdinaryDiffEqCore.trivial_limiter!), Static.False}; kwargs::@Kwargs{adaptive::Bool, unstable_check::DiffEqGPU.var"#100#106", abstol::Float32, reltol::Float32, save_everystep::Bool, save_start::Bool, maxiters::Int64, callback::Nothing, internalnorm::typeof(DiffEqGPU.diffeqgpunorm)})
+    @ OrdinaryDiffEqCore ~/.julia/packages/OrdinaryDiffEqCore/mhzxi/src/solve.jl:9
+ [30] __solve
+    @ ~/.julia/packages/OrdinaryDiffEqCore/mhzxi/src/solve.jl:1 [inlined]
+ [31] solve_call(_prob::ODEProblem{MtlMatrix{Float32, Metal.PrivateStorage}, Tuple{Float32, Float32}, true, MtlMatrix{SciMLBase.NullParameters, Metal.PrivateStorage}, ODEFunction{true, SciMLBase.FullSpecialize, DiffEqGPU.var"#12#16"{var"#rhs!#9"{MtlMatrix{Float32, Metal.PrivateStorage}, MtlMatrix{Float32, Metal.PrivateStorage}, MtlVector{Float32, Metal.PrivateStorage}, MtlVector{Float32, Metal.PrivateStorage}, Float32, Float32, Float32}, typeof(DiffEqGPU.gpu_kernel)}, LinearAlgebra.UniformScaling{Bool}, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, typeof(SciMLBase.DEFAULT_OBSERVED), Nothing, Nothing, Nothing, Nothing}, @Kwargs{}, SciMLBase.StandardODEProblem}, args::Tsit5{typeof(OrdinaryDiffEqCore.trivial_limiter!), typeof(OrdinaryDiffEqCore.trivial_limiter!), Static.False}; merge_callbacks::Bool, kwargshandle::Nothing, kwargs::@Kwargs{adaptive::Bool, unstable_check::DiffEqGPU.var"#100#106", abstol::Float32, reltol::Float32, save_everystep::Bool, save_start::Bool, maxiters::Int64, callback::Nothing, internalnorm::typeof(DiffEqGPU.diffeqgpunorm)})
+    @ DiffEqBase ~/.julia/packages/DiffEqBase/NZcXT/src/solve.jl:172
+ [32] solve_call
+    @ ~/.julia/packages/DiffEqBase/NZcXT/src/solve.jl:137 [inlined]
+ [33] #solve_up#38
+    @ ~/.julia/packages/DiffEqBase/NZcXT/src/solve.jl:630 [inlined]
+ [34] solve_up
+    @ ~/.julia/packages/DiffEqBase/NZcXT/src/solve.jl:603 [inlined]
+ [35] #solve#37
+    @ ~/.julia/packages/DiffEqBase/NZcXT/src/solve.jl:587 [inlined]
+ [36] batch_solve_up(ensembleprob::EnsembleProblem{ODEProblem{Vector{Float32}, Tuple{Float32, Float32}, true, SciMLBase.NullParameters, ODEFunction{true, SciMLBase.AutoSpecialize, var"#rhs!#9"{MtlMatrix{Float32, Metal.PrivateStorage}, MtlMatrix{Float32, Metal.PrivateStorage}, MtlVector{Float32, Metal.PrivateStorage}, MtlVector{Float32, Metal.PrivateStorage}, Float32, Float32, Float32}, LinearAlgebra.UniformScaling{Bool}, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, typeof(SciMLBase.DEFAULT_OBSERVED), Nothing, Nothing, Nothing, Nothing}, @Kwargs{}, SciMLBase.StandardODEProblem}, var"#prob_func#12"{Vector{Vector{Float32}}}, typeof(SciMLBase.DEFAULT_OUTPUT_FUNC), typeof(SciMLBase.DEFAULT_REDUCTION), Nothing}, probs::Vector{ODEProblem{Vector{Float32}, Tuple{Float32, Float32}, true, SciMLBase.NullParameters, ODEFunction{true, SciMLBase.AutoSpecialize, var"#rhs!#9"{MtlMatrix{Float32, Metal.PrivateStorage}, MtlMatrix{Float32, Metal.PrivateStorage}, MtlVector{Float32, Metal.PrivateStorage}, MtlVector{Float32, Metal.PrivateStorage}, Float32, Float32, Float32}, LinearAlgebra.UniformScaling{Bool}, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, typeof(SciMLBase.DEFAULT_OBSERVED), Nothing, Nothing, Nothing, Nothing}, @Kwargs{}, SciMLBase.StandardODEProblem}}, alg::Tsit5{typeof(OrdinaryDiffEqCore.trivial_limiter!), typeof(OrdinaryDiffEqCore.trivial_limiter!), Static.False}, ensemblealg::EnsembleGPUArray{MetalBackend}, I::UnitRange{Int64}, u0::Matrix{Float32}, p::Matrix{SciMLBase.NullParameters}; kwargs::@Kwargs{adaptive::Bool, unstable_check::DiffEqGPU.var"#100#106", abstol::Float32, reltol::Float32, save_everystep::Bool, save_start::Bool, maxiters::Int64})
+    @ DiffEqGPU ~/.julia/packages/DiffEqGPU/JsBHq/src/solve.jl:334
+ [37] batch_solve(ensembleprob::EnsembleProblem{ODEProblem{Vector{Float32}, Tuple{Float32, Float32}, true, SciMLBase.NullParameters, ODEFunction{true, SciMLBase.AutoSpecialize, var"#rhs!#9"{MtlMatrix{Float32, Metal.PrivateStorage}, MtlMatrix{Float32, Metal.PrivateStorage}, MtlVector{Float32, Metal.PrivateStorage}, MtlVector{Float32, Metal.PrivateStorage}, Float32, Float32, Float32}, LinearAlgebra.UniformScaling{Bool}, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, typeof(SciMLBase.DEFAULT_OBSERVED), Nothing, Nothing, Nothing, Nothing}, @Kwargs{}, SciMLBase.StandardODEProblem}, var"#prob_func#12"{Vector{Vector{Float32}}}, typeof(SciMLBase.DEFAULT_OUTPUT_FUNC), typeof(SciMLBase.DEFAULT_REDUCTION), Nothing}, alg::Tsit5{typeof(OrdinaryDiffEqCore.trivial_limiter!), typeof(OrdinaryDiffEqCore.trivial_limiter!), Static.False}, ensemblealg::EnsembleGPUArray{MetalBackend}, I::UnitRange{Int64}, adaptive::Bool; kwargs::@Kwargs{unstable_check::DiffEqGPU.var"#100#106", abstol::Float32, reltol::Float32, save_everystep::Bool, save_start::Bool, maxiters::Int64})
+    @ DiffEqGPU ~/.julia/packages/DiffEqGPU/JsBHq/src/solve.jl:255
+ [38] macro expansion
+    @ ./timing.jl:395 [inlined]
+ [39] __solve(ensembleprob::EnsembleProblem{ODEProblem{Vector{Float32}, Tuple{Float32, Float32}, true, SciMLBase.NullParameters, ODEFunction{true, SciMLBase.AutoSpecialize, var"#rhs!#9"{MtlMatrix{Float32, Metal.PrivateStorage}, MtlMatrix{Float32, Metal.PrivateStorage}, MtlVector{Float32, Metal.PrivateStorage}, MtlVector{Float32, Metal.PrivateStorage}, Float32, Float32, Float32}, LinearAlgebra.UniformScaling{Bool}, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, typeof(SciMLBase.DEFAULT_OBSERVED), Nothing, Nothing, Nothing, Nothing}, @Kwargs{}, SciMLBase.StandardODEProblem}, var"#prob_func#12"{Vector{Vector{Float32}}}, typeof(SciMLBase.DEFAULT_OUTPUT_FUNC), typeof(SciMLBase.DEFAULT_REDUCTION), Nothing}, alg::Tsit5{typeof(OrdinaryDiffEqCore.trivial_limiter!), typeof(OrdinaryDiffEqCore.trivial_limiter!), Static.False}, ensemblealg::EnsembleGPUArray{MetalBackend}; trajectories::Int64, batch_size::Int64, unstable_check::Function, adaptive::Bool, kwargs::@Kwargs{abstol::Float32, reltol::Float32, save_everystep::Bool, save_start::Bool, maxiters::Int64})
+    @ DiffEqGPU ~/.julia/packages/DiffEqGPU/JsBHq/src/solve.jl:55
+ [40] __solve
+    @ ~/.julia/packages/DiffEqGPU/JsBHq/src/solve.jl:1 [inlined]
+ [41] #solve#748
+    @ ~/.julia/packages/SciMLBase/emsSz/src/ensemble/basic_ensemble_solve.jl:387 [inlined]
+ [42] solve_batch(batch_size::Int64, N::Int64, target::Int64, T::Float32, line_offsets::Vector{Int32}, line_points::Vector{Int32}, point_col_scale::Vector{Float32}, A_cpu::Matrix{Float32}, At_cpu::Matrix{Float32}, line_count_cpu::Vector{Float32}, α::Float32, β::Float32, γ::Float32, seed::UInt64, batch_offset::Int64, n::Int64; use_gpu::Bool)
+    @ Main ~/Developer/Work/Research/ICLR/approach_1/main_metal_v6.jl:474
+ [43] solve_batch
+    @ ~/Developer/Work/Research/ICLR/approach_1/main_metal_v6.jl:415 [inlined]
+ [44] solve_n3l_metal(n::Int64, R::Int64, T::Float32, seed::UInt64, outdir::String; α::Float32, β::Float32, γ::Float32, batch_size::Int64, coeff_mode::String, col_normalization::String, verbose::Bool, progress_interval::Int64)
+    @ Main ~/Developer/Work/Research/ICLR/approach_1/main_metal_v6.jl:597
+ [45] main()
+    @ Main ~/Developer/Work/Research/ICLR/approach_1/main_metal_v6.jl:898
+ [46] #19
+    @ ~/Developer/Work/Research/ICLR/approach_1/main_metal_v6.jl:921 [inlined]
+ [47] (::var"#3#6"{var"#19#20"})()
+    @ Main ~/Developer/Work/Research/ICLR/approach_1/logging_utils.jl:34
+ [48] (::Base.RedirectStdStream)(thunk::var"#3#6"{var"#19#20"}, stream::Base.Process)
+    @ Base ./stream.jl:1429
+ [49] #2
+    @ ~/Developer/Work/Research/ICLR/approach_1/logging_utils.jl:32 [inlined]
+ [50] (::Base.RedirectStdStream)(thunk::var"#2#5"{Base.Process, var"#19#20"}, stream::Base.Process)
+    @ Base ./stream.jl:1429
+ [51] (::var"#1#4"{var"#19#20"})(io::Base.Process)
+    @ Main ~/Developer/Work/Research/ICLR/approach_1/logging_utils.jl:31
+ [52] open(f::var"#1#4"{var"#19#20"}, cmds::Base.CmdRedirect, args::String; kwargs::@Kwargs{})
+    @ Base ./process.jl:427
+ [53] open
+    @ ./process.jl:414 [inlined]
+ [54] run_with_terminal_log(f::var"#19#20", runner_name::String, args::Vector{String})
+    @ Main ~/Developer/Work/Research/ICLR/approach_1/logging_utils.jl:30
+ [55] top-level scope
+    @ ~/Developer/Work/Research/ICLR/approach_1/main_metal_v6.jl:920
+ [56] include(mod::Module, _path::String)
+    @ Base ./Base.jl:495
+ [57] exec_options(opts::Base.JLOptions)
+    @ Base ./client.jl:323

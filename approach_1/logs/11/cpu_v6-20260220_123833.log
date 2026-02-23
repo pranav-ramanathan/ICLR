@@ -1,0 +1,145 @@
+Precomputing lines for coefficient selection...
+Coefficient selection:
+  mode=normalized | base α=10.000, γ=4.500
+  normalized mode active with col-normalization=mean-incidence
+Precomputing lines...
+  Lines: 628 | Packed points: 2452 | Max len: 11 | Triple-equiv: 6992 | 0.001s
+  Collinearity normalization: mean-incidence | incidence mean=173.355, min=146.000, max=236.000
+============================================================
+N3L Gradient Flow — CPU Tsit5, Line-Based (v6)
+============================================================
+n=11, target=22 | α=10.000, β=1.0, γ=4.500
+Max: 4000 traj, T=15.0s, 12 threads
+Seed: 6012415491296809256 | Coeff mode: normalized | Col norm: mean-incidence
+Lines: 628 (triple-equiv: 6992) | Progress: every 50
+============================================================
+[     4] ★ NEW BEST: 6 viols (traj 1670)
+[     1] ★ NEW BEST: 7 viols (traj 2003)
+[    12] ★ NEW BEST: 2 viols (traj 670)
+[    50] best=2 | 24.6/s | eta=2m 41s
+[   100] best=2 | 44.7/s | eta=1m 27s
+[   150] best=2 | 61.2/s | eta=1m 3s
+[   200] best=2 | 75.3/s | eta=50s
+[   250] best=2 | 87.1/s | eta=43s
+[   300] best=2 | 97.4/s | eta=38s
+[   350] best=2 | 106.3/s | eta=34s
+[   400] best=2 | 114.4/s | eta=31s
+[   450] best=2 | 121.3/s | eta=29s
+[   500] best=2 | 128.3/s | eta=27s
+[   550] best=2 | 133.1/s | eta=26s
+[   600] best=2 | 137.9/s | eta=25s
+[   650] best=2 | 142.8/s | eta=23s
+[   700] best=2 | 146.8/s | eta=22s
+[   750] best=2 | 150.6/s | eta=22s
+[   800] best=2 | 153.8/s | eta=21s
+[   850] best=2 | 156.9/s | eta=20s
+[   900] best=2 | 159.4/s | eta=19s
+[   950] best=2 | 161.5/s | eta=19s
+[  1000] best=2 | 164.1/s | eta=18s
+[  1050] best=2 | 166.5/s | eta=18s
+[  1100] best=2 | 168.6/s | eta=17s
+[  1150] best=2 | 170.0/s | eta=17s
+[  1200] best=2 | 172.1/s | eta=16s
+[  1250] best=2 | 173.5/s | eta=16s
+[  1300] best=2 | 174.9/s | eta=15s
+[  1350] best=2 | 176.6/s | eta=15s
+[  1400] best=2 | 178.0/s | eta=15s
+[  1450] best=2 | 179.5/s | eta=14s
+[  1500] best=2 | 181.0/s | eta=14s
+[  1550] best=2 | 182.3/s | eta=13s
+[  1600] best=2 | 183.5/s | eta=13s
+[  1650] best=2 | 184.6/s | eta=13s
+[  1700] best=2 | 185.6/s | eta=12s
+[  1750] best=2 | 186.0/s | eta=12s
+[  1800] best=2 | 186.5/s | eta=12s
+[  1850] best=2 | 187.6/s | eta=11s
+[  1900] best=2 | 188.2/s | eta=11s
+[  1950] best=2 | 189.3/s | eta=11s
+[  2000] best=2 | 190.0/s | eta=11s
+[  2050] best=2 | 190.8/s | eta=10s
+[  2100] best=2 | 191.4/s | eta=10s
+[  2150] best=2 | 192.1/s | eta=10s
+[  2200] best=2 | 192.8/s | eta=9s
+[  2250] best=2 | 193.5/s | eta=9s
+[  2300] best=2 | 193.9/s | eta=9s
+[  2350] best=2 | 194.0/s | eta=9s
+[  2400] best=2 | 194.1/s | eta=8s
+[  2450] best=2 | 194.7/s | eta=8s
+[  2500] best=2 | 195.0/s | eta=8s
+[  2550] best=2 | 195.5/s | eta=7s
+[  2600] best=2 | 195.9/s | eta=7s
+[  2650] best=2 | 196.4/s | eta=7s
+[  2700] best=2 | 196.8/s | eta=7s
+[  2750] best=2 | 197.0/s | eta=6s
+[  2800] best=2 | 197.5/s | eta=6s
+[  2850] best=2 | 198.0/s | eta=6s
+[  2900] best=2 | 198.5/s | eta=6s
+[  2950] best=2 | 198.6/s | eta=5s
+[  3000] best=2 | 199.0/s | eta=5s
+[  3050] best=2 | 199.1/s | eta=5s
+[  3100] best=2 | 199.2/s | eta=5s
+[  3150] best=2 | 199.5/s | eta=4s
+[  3200] best=2 | 199.7/s | eta=4s
+[  3250] best=2 | 199.9/s | eta=4s
+[  3300] best=2 | 200.1/s | eta=3s
+[  3350] best=2 | 200.4/s | eta=3s
+[  3400] best=2 | 200.7/s | eta=3s
+[  3450] best=2 | 201.0/s | eta=3s
+
+🎉 SOLUTION! traj=2627, time=17.4s, tried=3488
+[  3500] best=2 | 201.0/s | eta=2s
+------------------------------------------------------------
+✓✓✓ SUCCESS ✓✓✓
+Time: 17.42s | Tried: 3505/4000 (87.6%) | Rate: 201.2/s
+
+Violation distribution:
+   0 violations:     1 ( 0.03%) 
+   2 violations:     3 ( 0.09%) 
+   3 violations:     4 ( 0.11%) 
+   4 violations:    22 ( 0.63%) 
+   5 violations:    35 ( 1.00%) 
+   6 violations:    73 ( 2.08%) █
+   7 violations:   138 ( 3.94%) ██
+   8 violations:   189 ( 5.39%) ███
+   9 violations:   257 ( 7.33%) ████
+  10 violations:   286 ( 8.16%) ████
+  11 violations:   331 ( 9.44%) █████
+  12 violations:   348 ( 9.93%) █████
+  13 violations:   319 ( 9.10%) █████
+  14 violations:   296 ( 8.45%) ████
+  15 violations:   256 ( 7.30%) ████
+  16 violations:   242 ( 6.90%) ███
+  17 violations:   183 ( 5.22%) ███
+  18 violations:   165 ( 4.71%) ██
+  19 violations:   109 ( 3.11%) ██
+  20 violations:    71 ( 2.03%) █
+  21 violations:    60 ( 1.71%) █
+  22 violations:    33 ( 0.94%) 
+  23 violations:    28 ( 0.80%) 
+  24 violations:    20 ( 0.57%) 
+  25 violations:    14 ( 0.40%) 
+  26 violations:     5 ( 0.14%) 
+  27 violations:     5 ( 0.14%) 
+  28 violations:     4 ( 0.11%) 
+  29 violations:     1 ( 0.03%) 
+  30 violations:     2 ( 0.06%) 
+  31 violations:     3 ( 0.09%) 
+  32 violations:     1 ( 0.03%) 
+  33 violations:     1 ( 0.03%) 
+
+Solution:
+  ● · · · ● · · · · · · 
+  ● · · · · · · ● · · · 
+  · · · · ● · · · · ● · 
+  · · ● · · ● · · · · · 
+  · · · · · · · ● · ● · 
+  · · ● · · · · · ● · · 
+  · ● · ● · · · · · · · 
+  · · · · · ● · · ● · · 
+  · ● · · · · ● · · · · 
+  · · · ● · · · · · · ● 
+  · · · · · · ● · · · ● 
+  Saved: solutions/11/sol_v6_20260220_123853_traj2627.txt
+
+Reproduce exact solution:
+julia --project=. --threads=auto main_v6.jl 11 --R 4000 --T 15.0 --coeff-mode normalized --col-normalization mean-incidence --seed 6012415491296809256

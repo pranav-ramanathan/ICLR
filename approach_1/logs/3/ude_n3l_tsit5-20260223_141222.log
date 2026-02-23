@@ -1,0 +1,24 @@
+Precomputing lines...
+  Lines: 8 | Packed points: 24 | Max len: 3 | Triple-equiv: 8 | 0.000s
+  Collinearity normalization: mean-incidence | incidence mean=2.667, min=2.000, max=4.000
+  Schedule bounds α:[2.000, 24.000] γ:[1.000, 12.000] η:[0.050, 5.000]
+====================================================================
+N3L UDE Training — CPU Tsit5 + Lux Schedules
+====================================================================
+n=3, target=6 | T=0.200 | batch=1 | iters=1 | lr=1.000e-03
+bounds α:[2.000, 24.000] γ:[1.000, 12.000] η:[0.050, 5.000]
+loss λ: col=1.000, bin=0.500, mass=1.000 | abstol=1.0e-06 reltol=1.0e-04
+seed=123 | hidden=32
+--------------------------------------------------------------------
+[train      1] loss=2.379592e-02 | eval best_viols=1 | avg|sum-k|=1.00138 | avg x(1-x)=0.05887
+              α(0,0.5T,T)=[8.219, 8.861, 9.647] γ=[8.502, 6.921, 6.435] η=[2.243, 2.502, 2.714]
+--------------------------------------------------------------------
+Training finished in 21.23s | best loss=2.379592e-02
+Final eval: best_viols=1 | avg|sum-k|=1.00138 | avg x(1-x)=0.05887
+Final schedules α(0,0.5T,T)=[8.219, 8.861, 9.647], γ=[8.502, 6.921, 6.435], η=[2.243, 2.502, 2.714]
+Saved model: /tmp/n3l_ude_smoke3/3/model_ude_20260223_141245.jld2
+
+Training complete.
+Model: /tmp/n3l_ude_smoke3/3/model_ude_20260223_141245.jld2
+Solve with:
+julia --project=. --threads=auto ude_n3l_tsit5.jl 3 --mode solve --model-path /tmp/n3l_ude_smoke3/3/model_ude_20260223_141245.jld2 --R 200 --T 0.2 --check-interval 0.1 --seed 123

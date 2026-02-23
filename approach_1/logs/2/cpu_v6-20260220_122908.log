@@ -1,0 +1,31 @@
+Precomputing lines for coefficient selection...
+Coefficient selection:
+  mode=normalized | base α=3.333, γ=5.000
+  normalized mode active with col-normalization=mean-incidence
+Precomputing lines...
+  Lines: 0 | Packed points: 0 | Max len: 0 | Triple-equiv: 0 | 0.000s
+  Collinearity normalization: mean-incidence | incidence mean=0.000, min=0.000, max=0.000
+============================================================
+N3L Gradient Flow — CPU Tsit5, Line-Based (v6)
+============================================================
+n=2, target=4 | α=3.333, β=1.0, γ=5.000
+Max: 200 traj, T=15.0s, 12 threads
+Seed: 1520774940044179858 | Coeff mode: normalized | Col norm: mean-incidence
+Lines: 0 (triple-equiv: 0) | Progress: every 50
+============================================================
+
+🎉 SOLUTION! traj=86, time=1.7s, tried=3
+------------------------------------------------------------
+✓✓✓ SUCCESS ✓✓✓
+Time: 1.69s | Tried: 12/200 (6.0%) | Rate: 7.1/s
+
+Violation distribution:
+   0 violations:    12 (100.00%) ████████████████████████████████████████
+
+Solution:
+  ● ● 
+  ● ● 
+  Saved: solutions/2/sol_v6_20260220_122911_traj86.txt
+
+Reproduce exact solution:
+julia --project=. --threads=auto main_v6.jl 2 --R 200 --T 15.0 --coeff-mode normalized --col-normalization mean-incidence --seed 1520774940044179858
